@@ -90,7 +90,7 @@
 
     function rezka2Mirror() {
       var url = Lampa.Storage.get('online_mod_rezka2_mirror', '') + '';
-      if (!url) return 'https://kvk.zone';
+      if (!url) return rezka2Host();
       if (url.indexOf('://') == -1) url = 'https://' + url;
       if (url.charAt(url.length - 1) === '/') url = url.substring(0, url.length - 1);
       return url;
@@ -1634,6 +1634,11 @@
       var error_message = '';
 
       function checkErrorForm(str) {
+        if (str && (str.indexOf('anubis_challenge') !== -1 || str.indexOf('techaro.lol-anubis') !== -1 || str.indexOf('/.within.website/x/cmd/anubis/') !== -1 || str.indexOf('Проверяем, что вы не бот') !== -1)) {
+          error_message = Lampa.Lang.translate('online_mod_rezka2_anubis');
+          return;
+        }
+
         var login_form = str.match(/<form id="check-form" class="check-form" method="post" action="\/ajax\/login\/">/);
 
         if (login_form) {
@@ -1692,7 +1697,7 @@
           var url = more_url + '&q=' + encodeURIComponent(query) + '&page=' + encodeURIComponent(page);
           network.clear();
           network.timeout(10000);
-          network["native"](component.proxyLink(url, prox, prox_enc, prox_enc, 'enc2t'), function (str) {
+          network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (str) {
             str = (str || '').replace(/\n/g, '');
             checkErrorForm(str);
             var links = str.match(/<div class="b-content__inline_item-link">\s*<a [^>]*>[^<]*<\/a>\s*<div>[^<]*<\/div>\s*<\/div>/g);
@@ -1901,8 +1906,47 @@
             if (data && data.length && data.forEach) display(data, have_more, query);else display([]);
           });
         };
+        /**
+         * Прокси не передаёт строку запроса в engine/ajax/search.php,
+         * поэтому там ищем через обычную страницу поиска
+         */
 
-        query_title_search();
+
+        var query_full_search = function query_full_search() {
+          var query = component.cleanTitle(select_title);
+          query_more(query, 1, [], function (items, have_more) {
+            if (items && items.length) {
+              var sure = items.filter(function (card) {
+                if (search_year && card.year && (card.year <= search_year - 2 || card.year >= search_year + 2)) return false;
+                return component.equalAnyTitle([card.title], orig_titles.concat([select_title]));
+              });
+
+              if (sure.length === 1) {
+                getPage(sure[0].link);
+                return;
+              }
+
+              _this.wait_similars = true;
+              items.forEach(function (card) {
+                card.is_similars = true;
+              });
+
+              if (have_more) {
+                component.similars(items, search_more, {
+                  items: [],
+                  query: query,
+                  page: 2
+                });
+              } else {
+                component.similars(items);
+              }
+
+              component.loading(false);
+            } else if (error_message) component.empty(error_message);else component.emptyForQuery(select_title);
+          });
+        };
+
+        if (prox) query_full_search();else query_title_search();
       };
 
       this.extendChoice = function (saved) {
@@ -13833,6 +13877,13 @@
           be: 'Кукі для Kinobase',
           en: 'Cookie for Kinobase',
           zh: 'Kinobase 的 Cookie'
+        },
+        online_mod_rezka2_anubis: {
+          ru: 'HDrezka защищается от ботов. Включите «Прокси для балансера HDrezka» в настройках',
+          uk: 'HDrezka захищається від ботів. Увімкніть «Проксі для балансера HDrezka» у налаштуваннях',
+          be: 'HDrezka абараняецца ад ботаў. Уключыце «Проксі для балансера HDrezka» у наладах',
+          en: 'HDrezka is blocking bots. Enable "Proxy for HDrezka balancer" in the settings',
+          zh: 'HDrezka 正在拦截机器人。请在设置中启用“HDrezka 平衡器代理”'
         },
         online_mod_rezka2_mirror: {
           ru: 'Зеркало для HDrezka',
