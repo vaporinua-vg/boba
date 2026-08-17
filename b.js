@@ -355,6 +355,25 @@
       return link;
     }
 
+    function markPlayerUrl(url) {
+      if (!url) return url;
+      if (/#\.(m3u8|mpd|mp4)(\?|$)/i.test(url)) return url;
+      var base = url.split('#')[0];
+
+      if (/\.m3u8(\?|$)/i.test(base) || /\/master\.m3u8/i.test(base) || /\/video\.m3u8/i.test(base)) {
+        return base + '#.m3u8';
+      }
+
+      if (/\.mpd(\?|$)/i.test(base)) return base + '#.mpd';
+      if (/\.mp4(\?|$)/i.test(base)) return url;
+
+      if (/okcdn\.ru\//i.test(base) || /(?:vk-cdn|vkuser|userapi)\./i.test(base)) {
+        return base + '#.mp4';
+      }
+
+      return url;
+    }
+
     function randomWords(words, len) {
       words = words || [];
       len = len || 0;
@@ -524,6 +543,7 @@
       fixLink: fixLink,
       fixLinkProtocol: fixLinkProtocol,
       proxyLink: proxyLink,
+      markPlayerUrl: markPlayerUrl,
       randomWords: randomWords,
       randomChars: randomChars,
       randomHex: randomHex,
@@ -3498,7 +3518,7 @@
       var select_title = '';
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true; //let prefer_dash  = Lampa.Storage.field('online_mod_prefer_dash') === true
 
-      var lampa_player = Lampa.Storage.field('online_mod_collaps_lampa_player') === true;
+      var lampa_player = Lampa.Storage.field('online_mod_collaps_lampa_player') === true && !Lampa.Platform.is('android');
       var prox = component.proxy('collaps');
       var base = 'api.ortified.ws';
       var host = 'https://' + base;
@@ -3521,7 +3541,7 @@
       }
 
       var net_method = lampa_player ? 'silent' : 'native';
-      var play_headers = !prox && !lampa_player && Lampa.Platform.is('android') ? {
+      var play_headers = Lampa.Platform.is('android') ? {
         'User-Agent': user_agent,
         'Origin': host,
         'Referer': ref
@@ -3674,7 +3694,7 @@
         }
 
         url = component.fixLinkProtocol(url, prefer_http, true);
-        return url;
+        return Utils.markPlayerUrl(url);
       }
       /**
        * Отфильтровать файлы
@@ -9392,7 +9412,7 @@
         }
 
         items.forEach(function (item) {
-          item.file = component.proxyLink(component.fixLinkProtocol(item.file, prefer_http, true), prox, prox_enc);
+          item.file = Utils.markPlayerUrl(component.proxyLink(component.fixLinkProtocol(item.file, prefer_http, true), prox, prox_enc));
         });
         return items;
       }
@@ -12245,7 +12265,7 @@
     var proxyInitialized = {};
     var proxyWindow = {};
     var proxyCalls = {};
-    var default_balanser = 'cdnvideohub';
+    var default_balanser = 'collaps';
 
     function component(object) {
       var network = new Lampa.Reguest();
@@ -13220,12 +13240,16 @@
               if (needHackHlsLink(qualityMap[ID])) {
                 qualityMap[ID] += '?';
               }
+
+              qualityMap[ID] = Utils.markPlayerUrl(qualityMap[ID]);
             }
           }
 
           if (needHackHlsLink(defValue)) {
             defValue += '?';
           }
+
+          defValue = Utils.markPlayerUrl(defValue);
         }
 
         if (qualityMap) {
@@ -13612,7 +13636,7 @@
       };
     }
 
-    var mod_version = '18.08.2026';
+    var mod_version = '18.08.2026a';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
