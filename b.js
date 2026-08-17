@@ -1,4 +1,4 @@
-// 17.08.2026
+// 17.08.2026c
 
 (function () {
     'use strict';
@@ -1591,13 +1591,13 @@
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true;
       var prefer_mp4 = Lampa.Storage.field('online_mod_prefer_mp4') === true;
       var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
-      var prox = Lampa.Platform.is('android') ? '' : component.proxy('rezka2');
+      var prox = typeof AndroidJS !== 'undefined' ? '' : component.proxy('rezka2');
       var custom_mirror = (Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').trim();
       var host = custom_mirror && !(prox && !proxy_mirror) ? Utils.rezka2Mirror() : 'https://rezka.ag';
       var ref = host + '/';
-      var logged_in = !(prox || Lampa.Platform.is('android'));
+      var logged_in = !(prox || typeof AndroidJS !== 'undefined');
       var user_agent = Utils.rezkaUserAgent();
-      var headers = Lampa.Platform.is('android') ? {
+      var headers = typeof AndroidJS !== 'undefined' ? {
         'Origin': host,
         'Referer': ref,
         'User-Agent': user_agent
@@ -1635,7 +1635,7 @@
 
       function checkErrorForm(str) {
         if (str && (str.indexOf('anubis_challenge') !== -1 || str.indexOf('techaro.lol-anubis') !== -1 || str.indexOf('/.within.website/x/cmd/anubis/') !== -1 || str.indexOf('Проверяем, что вы не бот') !== -1)) {
-          error_message = 'Proxy required';
+          error_message = 'HDrezka заблокировала запрос (Anubis). В браузере lampa.mx это часто не проходит — откройте в приложении Lampa на Android.';
           return;
         }
 
@@ -1902,6 +1902,15 @@
         };
 
         var query_title_search = function query_title_search() {
+          if (prox) {
+            search_more({
+              items: [],
+              query: component.cleanTitle(select_title),
+              page: 1
+            });
+            return;
+          }
+
           query_search(component.cleanTitle(select_title), [], function (data, have_more, query) {
             if (data && data.length && data.forEach) display(data, have_more, query);else display([]);
           });
@@ -13434,7 +13443,7 @@
       };
     }
 
-    var mod_version = '17.08.2026';
+    var mod_version = '17.08.2026c';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -13456,7 +13465,6 @@
     function initStorage() {
       if (!Utils.isDebug()) {
         Lampa.Storage.set('online_mod_proxy_lumex', 'false');
-        Lampa.Storage.set('online_mod_proxy_rezka2', 'false');
         Lampa.Storage.set('online_mod_proxy_kinobase', 'false');
         Lampa.Storage.set('online_mod_proxy_collaps', 'false');
         Lampa.Storage.set('online_mod_proxy_cdnmovies', 'false');
@@ -13480,7 +13488,7 @@
         Lampa.Storage.set('online_mod_proxy_filmix', 'true');
       }
 
-      Lampa.Storage.set('online_mod_proxy_rezka2', 'false');
+      Lampa.Storage.set('online_mod_proxy_rezka2', typeof AndroidJS !== 'undefined' ? 'false' : 'true');
 
       if ((Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').replace(/\/$/, '') === 'https://kvk.zone') {
         Lampa.Storage.set('online_mod_rezka2_mirror', '');
@@ -13503,7 +13511,7 @@
       Lampa.Params.trigger('online_mod_proxy_other', false);
       Lampa.Params.trigger('online_mod_proxy_lumex', false);
       Lampa.Params.trigger('online_mod_proxy_rezka', false);
-      Lampa.Params.trigger('online_mod_proxy_rezka2', false);
+      Lampa.Params.trigger('online_mod_proxy_rezka2', typeof AndroidJS === 'undefined');
       Lampa.Params.trigger('online_mod_proxy_rezka2_mirror', false);
       Lampa.Params.trigger('online_mod_proxy_kinobase', false);
       Lampa.Params.trigger('online_mod_proxy_collaps', false);
@@ -14763,7 +14771,7 @@
 
     function addSettingsOnlineMod() {
       if (Lampa.Settings.main && Lampa.Settings.main() && !Lampa.Settings.main().render().find('[data-component="online_boba"]').length) {
-        var field = $(Lampa.Lang.translate("<div class=\"settings-folder selector\" data-component=\"online_mod\">\n            <div class=\"settings-folder__icon\">\n                <svg height=\"260\" viewBox=\"0 0 244 260\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n                <path d=\"M242,88v170H10V88h41l-38,38h37.1l38-38h38.4l-38,38h38.4l38-38h38.3l-38,38H204L242,88L242,88z M228.9,2l8,37.7l0,0 L191.2,10L228.9,2z M160.6,56l-45.8-29.7l38-8.1l45.8,29.7L160.6,56z M84.5,72.1L38.8,42.4l38-8.1l45.8,29.7L84.5,72.1z M10,88 L2,50.2L47.8,80L10,88z\" fill=\"white\"/>\n                </svg>\n            </div>\n            <div class=\"settings-folder__name\">#{online_mod_title_full}</div>\n        </div>"));
+        var field = $(Lampa.Lang.translate("<div class=\"settings-folder selector\" data-component=\"online_boba\">\n            <div class=\"settings-folder__icon\">\n                <svg height=\"260\" viewBox=\"0 0 244 260\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n                <path d=\"M242,88v170H10V88h41l-38,38h37.1l38-38h38.4l-38,38h38.4l38-38h38.3l-38,38H204L242,88L242,88z M228.9,2l8,37.7l0,0 L191.2,10L228.9,2z M160.6,56l-45.8-29.7l38-8.1l45.8,29.7L160.6,56z M84.5,72.1L38.8,42.4l38-8.1l45.8,29.7L84.5,72.1z M10,88 L2,50.2L47.8,80L10,88z\" fill=\"white\"/>\n                </svg>\n            </div>\n            <div class=\"settings-folder__name\">#{online_mod_title_full}</div>\n        </div>"));
         Lampa.Settings.main().render().find('[data-component="more"]').after(field);
         Lampa.Settings.main().update();
       }
@@ -14777,12 +14785,12 @@
       }
 
       if (Utils.isDebug()) {
-        template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_rezka2\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_balanser} HDrezka</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
         template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_kinobase\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_balanser} Kinobase</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
         template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_collaps\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_balanser} Collaps</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
         template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_cdnmovies\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_balanser} CDNMovies</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
       }
 
+      template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_rezka2\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_balanser} HDrezka</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_filmix\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_balanser} Filmix</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
 
       if (Utils.isDebug()) {
@@ -14870,6 +14878,7 @@
 
       template += "\n    </div>";
       Lampa.Template.add('settings_online_boba', template);
+      Lampa.Template.add('settings_online_mod', template);
       if (window.appready) addSettingsOnlineMod();else {
         Lampa.Listener.follow('app', function (e) {
           if (e.type == 'ready') addSettingsOnlineMod();
