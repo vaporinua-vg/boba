@@ -1,4 +1,4 @@
-// 25.07.2026
+// 17.08.2026
 
 (function () {
     'use strict';
@@ -181,9 +181,8 @@
       var ip = getMyIp() || '';
       var param_ip = Lampa.Storage.field('online_mod_proxy_find_ip') === true ? 'ip' + ip + '/' : '';
       var proxy1 = new Date().getHours() % 2 ? 'https://cors.nb557.workers.dev/' : 'https://cors.fx666.workers.dev/';
-      var proxy2_base = 'https://apn-latest.onrender.com/';
-      var proxy2 = proxy2_base + (param_ip ? '' : 'ip/');
-      var proxy3 = 'https://cors557.deno.dev/';
+      var proxy2 = proxy1;
+      var proxy3 = 'https://cors.nb557.deno.net/';
       var proxy_secret = '';
       var proxy_secret_ip = '';
 
@@ -205,7 +204,7 @@
       if (name === 'cookie') return user_proxy1;
       if (name === 'cookie2') return user_proxy2;
       if (name === 'cookie3') return user_proxy3;
-      if (name === 'ip') return proxy2_base;
+      if (name === 'ip') return proxy3;
 
       if (Lampa.Storage.field('online_mod_proxy_' + name) === true) {
         if (name === 'iframe') return user_proxy2;
@@ -1592,7 +1591,7 @@
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true;
       var prefer_mp4 = Lampa.Storage.field('online_mod_prefer_mp4') === true;
       var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
-      var prox = component.proxy('rezka2');
+      var prox = Lampa.Platform.is('android') ? '' : component.proxy('rezka2');
       var custom_mirror = (Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').trim();
       var host = custom_mirror && !(prox && !proxy_mirror) ? Utils.rezka2Mirror() : 'https://rezka.ag';
       var ref = host + '/';
@@ -1698,7 +1697,7 @@
           var url = more_url + '&q=' + encodeURIComponent(query) + '&page=' + encodeURIComponent(page);
           network.clear();
           network.timeout(10000);
-          network["native"](component.proxyLink(url, prox, prox_enc, prox_enc, 'enc2t'), function (str) {
+          network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (str) {
             str = (str || '').replace(/\n/g, '');
             checkErrorForm(str);
             var links = str.match(/<div class="b-content__inline_item-link">\s*<a [^>]*>[^<]*<\/a>\s*<div>[^<]*<\/div>\s*<\/div>/g);
@@ -13435,7 +13434,7 @@
       };
     }
 
-    var mod_version = '25.07.2026b';
+    var mod_version = '17.08.2026';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -13457,6 +13456,7 @@
     function initStorage() {
       if (!Utils.isDebug()) {
         Lampa.Storage.set('online_mod_proxy_lumex', 'false');
+        Lampa.Storage.set('online_mod_proxy_rezka2', 'false');
         Lampa.Storage.set('online_mod_proxy_kinobase', 'false');
         Lampa.Storage.set('online_mod_proxy_collaps', 'false');
         Lampa.Storage.set('online_mod_proxy_cdnmovies', 'false');
@@ -13480,7 +13480,7 @@
         Lampa.Storage.set('online_mod_proxy_filmix', 'true');
       }
 
-      Lampa.Storage.set('online_mod_proxy_rezka2', 'true');
+      Lampa.Storage.set('online_mod_proxy_rezka2', 'false');
 
       if ((Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').replace(/\/$/, '') === 'https://kvk.zone') {
         Lampa.Storage.set('online_mod_rezka2_mirror', '');
@@ -13503,7 +13503,7 @@
       Lampa.Params.trigger('online_mod_proxy_other', false);
       Lampa.Params.trigger('online_mod_proxy_lumex', false);
       Lampa.Params.trigger('online_mod_proxy_rezka', false);
-      Lampa.Params.trigger('online_mod_proxy_rezka2', true);
+      Lampa.Params.trigger('online_mod_proxy_rezka2', false);
       Lampa.Params.trigger('online_mod_proxy_rezka2_mirror', false);
       Lampa.Params.trigger('online_mod_proxy_kinobase', false);
       Lampa.Params.trigger('online_mod_proxy_collaps', false);
