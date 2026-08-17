@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Collaps</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+    #msg {
+      position: absolute; left: 0; right: 0; top: 40%;
+      color: #fff; font: 22px/1.4 sans-serif; text-align: center;
+      padding: 0 24px; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="msg">Загрузка…</div>
+  <video id="v" playsinline webkit-playsinline></video>
+  <script src="hls.min.js"></script>
+  <script>
+    (function () {
+      var video = document.getElementById('v');
+      var msg = document.getElementById('msg');
+      var hls;
+      var dashPlayer;
+      var readySent = false;
+
+      function show(text) {
+        msg.textContent = text || '';
+        msg.style.display = text ? 'block' : 'none';
+      }
+
+      function isDash(url) {
+        return /\.mpd(\?|#|$)/i.test(url || '');
+      }
+
+      function destroy() {
+        if (hls) {
+          try { hls.destroy(); } catch (e) {}
+          hls = null;
+        }
+        if (dashPlayer) {
+          try { dashPlayer.reset(); } catch (e) {}
+          dashPlayer = null;
+        }
+        try { video.pause(); } catch (e) {}
+        video.removeAttribute('src');
+      }
+
+      function playHls(url) {
+        if (window.Hls && Hls.isSupported()) {
+          hls = new Hls({
+            enableWorker: false,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60
+          });
+          hls.loadSource(url);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            show('');
+            var p = video.play();
+            if (p && p.catch) p.catch(function () {});
+          });
+          hls.on(Hls.Events.ERROR, function (e, data) {
+            if (data && data.fatal) show('Ошибка потока Collaps');
+          });
+          return;
+        }
+        video.src = url;
+        video.addEventListener('loadedmetadata', function () { show(''); });
+        var p = video.play();
+        if (p && p.catch) p.catch(function () {});
+      }
+
+      function playDash(url) {
+        if (!window.dashjs) {
+          show('DASH на этом телевизоре недоступен, откройте обычный Collaps');
+          return;
+        }
+        dashPlayer = dashjs.MediaPlayer().create();
+        dashPlayer.initialize(video, url, true);
+        video.addEventListener('playing', function () { show(''); });
+      }
+
+      function playUrl(url) {
+        if (!url || !/^https?:\/\//i.test(url)) {
+          show('Нет ссылки на поток');
+          return;
+        }
+        destroy();
+        show('Загрузка…');
+        if (isDash(url)) playDash(url);
+        else playHls(url);
+      }
+
+      function toggle() {
+        if (video.paused) {
+          var p = video.play();
+          if (p && p.catch) p.catch(function () {});
+        } else video.pause();
+      }
+
+      function seek(delta) {
+        try {
+          if (isFinite(video.duration) && video.duration > 0) {
+            video.currentTime = Math.max(0, Math.min(video.duration - 1, video.currentTime + delta));
+          }
+        } catch (e) {}
+      }
+
+      window.addEventListener('message', function (ev) {
+        var data = ev.data;
+        if (!data || data.type !== 'collaps-play-cmd') return;
+        if (data.cmd === 'play' && data.url) playUrl(data.url);
+        else if (data.cmd === 'toggle') toggle();
+        else if (data.cmd === 'seek') seek(data.delta || 0);
+        else if (data.cmd === 'stop') destroy();
+      });
+
+      function sendReady() {
+        if (readySent) return;
+        readySent = true;
+        try { window.parent.postMessage({ type: 'collaps-play-ready' }, '*'); } catch (e) {}
+      }
+
+      sendReady();
+    })();
+  </script>
+</body>
+</html>

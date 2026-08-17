@@ -1,7 +1,9 @@
-// 17.08.2026e
+// 17.08.2026f
 
 (function () {
     'use strict';
+
+    var pluginScriptSrc = document.currentScript && document.currentScript.src || '';
 
     function startsWith(str, searchString) {
       return str.lastIndexOf(searchString, 0) === 0;
@@ -3237,6 +3239,136 @@
       }
     }
 
+    var pluginDir = function () {
+      var src = pluginScriptSrc;
+      if (!src) {
+        var scripts = document.getElementsByTagName('script');
+        for (var i = scripts.length - 1; i >= 0; i--) {
+          var s = scripts[i].src || '';
+          if (/boba\/b\.js/i.test(s) || /\/b\.js(\?|$)/i.test(s)) {
+            src = s;
+            break;
+          }
+        }
+      }
+      if (!src) return 'https://vaporinua-vg.github.io/boba/';
+      return src.replace(/\/[^\/?#]+([?#].*)?$/, '/');
+    }();
+
+    function needCollapsEmbedPlayer() {
+      try {
+        if (typeof AndroidJS !== 'undefined') return false;
+        if (Lampa.Platform && Lampa.Platform.is('android')) return false;
+        var host = (window.location.hostname || '').toLowerCase();
+        if (host === 'lampa.mx') return true;
+        if (window.TVXHost || window.TVXManager) return true;
+        if (Lampa.Platform) {
+          if (Lampa.Platform.is('webos')) return true;
+          if (Lampa.Platform.is('tizen')) return true;
+          if (Lampa.Platform.is('orsay')) return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    function closeCollapsEmbed() {
+      var nodes = document.querySelectorAll('.boba-collaps-player');
+      for (var i = 0; i < nodes.length; i++) {
+        try {
+          if (nodes[i].contentWindow) {
+            nodes[i].contentWindow.postMessage({
+              type: 'collaps-play-cmd',
+              cmd: 'stop'
+            }, '*');
+          }
+        } catch (e) {}
+        if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
+      }
+    }
+
+    function playCollapsEmbed(url, title) {
+      closeCollapsEmbed();
+      var iframe = document.createElement('iframe');
+      iframe.className = 'boba-collaps-player';
+      iframe.setAttribute('allow', 'autoplay; fullscreen');
+      iframe.setAttribute('src', pluginDir + 'collaps-play.html');
+      iframe.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;border:0;z-index:2147483000;background:#000';
+      document.body.appendChild(iframe);
+      var sent = false;
+
+      function sendPlay() {
+        if (sent) return;
+        sent = true;
+        try {
+          iframe.contentWindow.postMessage({
+            type: 'collaps-play-cmd',
+            cmd: 'play',
+            url: url,
+            title: title || ''
+          }, '*');
+        } catch (e) {}
+      }
+
+      function onMessage(ev) {
+        if (!ev.data || ev.data.type !== 'collaps-play-ready') return;
+        sendPlay();
+      }
+
+      window.addEventListener('message', onMessage);
+      iframe.addEventListener('load', function () {
+        setTimeout(sendPlay, 250);
+      });
+      var prev = 'content';
+
+      try {
+        prev = Lampa.Controller.enabled().name || 'content';
+      } catch (e) {}
+
+      Lampa.Controller.add('boba_collaps_embed', {
+        toggle: function toggle() {},
+        enter: function enter() {
+          try {
+            iframe.contentWindow.postMessage({
+              type: 'collaps-play-cmd',
+              cmd: 'toggle'
+            }, '*');
+          } catch (e) {}
+        },
+        playpause: function playpause() {
+          try {
+            iframe.contentWindow.postMessage({
+              type: 'collaps-play-cmd',
+              cmd: 'toggle'
+            }, '*');
+          } catch (e) {}
+        },
+        left: function left() {
+          try {
+            iframe.contentWindow.postMessage({
+              type: 'collaps-play-cmd',
+              cmd: 'seek',
+              delta: -15
+            }, '*');
+          } catch (e) {}
+        },
+        right: function right() {
+          try {
+            iframe.contentWindow.postMessage({
+              type: 'collaps-play-cmd',
+              cmd: 'seek',
+              delta: 15
+            }, '*');
+          } catch (e) {}
+        },
+        back: function back() {
+          window.removeEventListener('message', onMessage);
+          closeCollapsEmbed();
+          Lampa.Controller.toggle(prev);
+        }
+      });
+      Lampa.Controller.toggle('boba_collaps_embed');
+    }
+
     function collaps(component, _object, prefer_dash) {
       var network = new Lampa.Reguest();
       var extract = {};
@@ -3244,7 +3376,9 @@
       var select_title = '';
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true; //let prefer_dash  = Lampa.Storage.field('online_mod_prefer_dash') === true
 
-      var lampa_player = Lampa.Storage.field('online_mod_collaps_lampa_player') === true;
+      var embed_player = needCollapsEmbedPlayer();
+      if (embed_player) prefer_dash = false;
+      var lampa_player = !embed_player && Lampa.Storage.field('online_mod_collaps_lampa_player') === true;
       var prox = component.proxy('collaps');
       var base = 'api.ortified.ws';
       var host = 'https://' + base;
@@ -3576,9 +3710,13 @@
               }
 
               if (playlist.length > 1) first.playlist = playlist;
-              if (options && options.runas) Lampa.Player.runas(options.runas);else if (lampa_player) Lampa.Player.runas('lampa');
-              Lampa.Player.play(first);
-              Lampa.Player.playlist(playlist);
+              if (embed_player) {
+                playCollapsEmbed(first.url, first.title);
+              } else {
+                if (options && options.runas) Lampa.Player.runas(options.runas);else if (lampa_player) Lampa.Player.runas('lampa');
+                Lampa.Player.play(first);
+                Lampa.Player.playlist(playlist);
+              }
 
               if (viewed.indexOf(hash_file) == -1) {
                 viewed.push(hash_file);
@@ -13460,7 +13598,7 @@
       };
     }
 
-    var mod_version = '17.08.2026e';
+    var mod_version = '17.08.2026f';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
