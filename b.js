@@ -1,4 +1,4 @@
-// 17.08.2026c
+// 17.08.2026d
 
 (function () {
     'use strict';
@@ -403,6 +403,21 @@
       return false;
     }
 
+    function canDirectRezka() {
+      try {
+        if (typeof AndroidJS !== 'undefined') return true;
+        if (window.TVXHost || window.TVXManager) return true;
+        if (typeof Lampa !== 'undefined' && Lampa.Platform) {
+          if (Lampa.Platform.is('webos')) return true;
+          if (Lampa.Platform.is('tizen')) return true;
+          if (Lampa.Platform.is('orsay')) return true;
+          if (Lampa.Platform.is('apple')) return true;
+        }
+      } catch (e) {}
+
+      return false;
+    }
+
     var Utils = {
       decodeSecret: decodeSecret,
       isDebug: isDebug,
@@ -420,6 +435,7 @@
       filmixUserAgent: filmixUserAgent,
       baseUserAgent: baseUserAgent,
       rezkaUserAgent: rezkaUserAgent,
+      canDirectRezka: canDirectRezka,
       vcdnToken: vcdnToken,
       setMyIp: setMyIp,
       getMyIp: getMyIp,
@@ -1591,13 +1607,14 @@
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true;
       var prefer_mp4 = Lampa.Storage.field('online_mod_prefer_mp4') === true;
       var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
-      var prox = typeof AndroidJS !== 'undefined' ? '' : component.proxy('rezka2');
+      var direct = Utils.canDirectRezka();
+      var prox = direct ? '' : component.proxy('rezka2');
       var custom_mirror = (Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').trim();
       var host = custom_mirror && !(prox && !proxy_mirror) ? Utils.rezka2Mirror() : 'https://rezka.ag';
       var ref = host + '/';
-      var logged_in = !(prox || typeof AndroidJS !== 'undefined');
+      var logged_in = !(prox || direct);
       var user_agent = Utils.rezkaUserAgent();
-      var headers = typeof AndroidJS !== 'undefined' ? {
+      var headers = direct ? {
         'Origin': host,
         'Referer': ref,
         'User-Agent': user_agent
@@ -1614,7 +1631,7 @@
       if (cookie.indexOf('PHPSESSID=') == -1) cookie = 'PHPSESSID=' + Utils.randomId(26) + (cookie ? '; ' + cookie : '');
 
       if (cookie) {
-        if (Lampa.Platform.is('android')) {
+        if (direct) {
           headers.Cookie = cookie;
         }
 
@@ -1635,7 +1652,7 @@
 
       function checkErrorForm(str) {
         if (str && (str.indexOf('anubis_challenge') !== -1 || str.indexOf('techaro.lol-anubis') !== -1 || str.indexOf('/.within.website/x/cmd/anubis/') !== -1 || str.indexOf('Проверяем, что вы не бот') !== -1)) {
-          error_message = 'HDrezka заблокировала запрос (Anubis). В браузере lampa.mx это часто не проходит — откройте в приложении Lampa на Android.';
+          error_message = 'HDrezka заблокировала запрос (Anubis). На телевизоре нужен прямой запрос, без CORS-прокси.';
           return;
         }
 
@@ -13443,7 +13460,7 @@
       };
     }
 
-    var mod_version = '17.08.2026c';
+    var mod_version = '17.08.2026d';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -13488,7 +13505,7 @@
         Lampa.Storage.set('online_mod_proxy_filmix', 'true');
       }
 
-      Lampa.Storage.set('online_mod_proxy_rezka2', typeof AndroidJS !== 'undefined' ? 'false' : 'true');
+      Lampa.Storage.set('online_mod_proxy_rezka2', Utils.canDirectRezka() ? 'false' : 'true');
 
       if ((Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').replace(/\/$/, '') === 'https://kvk.zone') {
         Lampa.Storage.set('online_mod_rezka2_mirror', '');
@@ -13511,7 +13528,7 @@
       Lampa.Params.trigger('online_mod_proxy_other', false);
       Lampa.Params.trigger('online_mod_proxy_lumex', false);
       Lampa.Params.trigger('online_mod_proxy_rezka', false);
-      Lampa.Params.trigger('online_mod_proxy_rezka2', typeof AndroidJS === 'undefined');
+      Lampa.Params.trigger('online_mod_proxy_rezka2', !Utils.canDirectRezka());
       Lampa.Params.trigger('online_mod_proxy_rezka2_mirror', false);
       Lampa.Params.trigger('online_mod_proxy_kinobase', false);
       Lampa.Params.trigger('online_mod_proxy_collaps', false);
