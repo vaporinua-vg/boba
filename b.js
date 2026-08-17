@@ -12336,37 +12336,6 @@
       isAndroid && Utils.checkAndroidVersion(339);
       var collapsBlocked = false;
       var all_sources = [{
-        name: 'lumex',
-        title: 'Lumex',
-        source: new lumex(this, object),
-        search: false,
-        kp: false,
-        imdb: true,
-        disabled: true
-      }, {
-        name: 'lumex2',
-        title: 'Lumex (Ads)',
-        source: new lumex2(this, object),
-        search: false,
-        kp: false,
-        imdb: true,
-        disabled: true
-      }, {
-        name: 'rezka2',
-        title: 'HDrezka',
-        source: new rezka2(this, object),
-        search: true,
-        kp: false,
-        imdb: false
-      }, {
-        name: 'kinobase',
-        title: 'Kinobase',
-        source: new kinobase(this, object),
-        search: true,
-        kp: false,
-        imdb: false,
-        disabled: true
-      }, {
         name: 'collaps',
         title: 'Collaps',
         source: new collaps(this, object, false),
@@ -12383,14 +12352,6 @@
         imdb: true,
         disabled: collapsBlocked
       }, {
-        name: 'cdnmovies',
-        title: 'CDNMovies',
-        source: new cdnmovies(this, object),
-        search: false,
-        kp: true,
-        imdb: true,
-        disabled: true
-      }, {
         name: 'filmix',
         title: 'Filmix',
         source: new filmix(this, object),
@@ -12398,69 +12359,19 @@
         kp: false,
         imdb: false
       }, {
-        name: 'zetflix',
-        title: 'Zetflix',
-        source: new zetflix(this, object),
-        search: false,
-        kp: true,
-        imdb: false,
-        disabled: true
-      }, {
         name: 'fancdn',
         title: 'FanCDN',
         source: new fancdn(this, object),
         search: true,
         kp: false,
-        imdb: false,
-        disabled: disable_dbg
-      }, {
-        name: 'fancdn2',
-        title: 'FanCDN (ID)',
-        source: new fancdn2(this, object),
-        search: false,
-        kp: true,
-        imdb: true,
-        disabled: true
+        imdb: false
       }, {
         name: 'fanserials',
         title: 'FanSerials',
         source: new fanserials(this, object),
         search: false,
         kp: true,
-        imdb: false,
-        disabled: disable_dbg && !isAndroid
-      }, {
-        name: 'videoseed',
-        title: 'VideoSeed',
-        source: new videoseed(this, object),
-        search: false,
-        kp: true,
-        imdb: true,
-        disabled: true
-      }, {
-        name: 'vibix',
-        title: 'Vibix',
-        source: new vibix(this, object),
-        search: false,
-        kp: true,
-        imdb: true,
-        disabled: true
-      }, {
-        name: 'redheadsound',
-        title: 'RedHeadSound',
-        source: new redheadsound(this, object, false),
-        search: true,
-        kp: false,
-        imdb: true,
-        disabled: true
-      }, {
-        name: 'redheadsound-dash',
-        title: 'RedHeadSound (DASH)',
-        source: new redheadsound(this, object, true),
-        search: true,
-        kp: false,
-        imdb: true,
-        disabled: true
+        imdb: false
       }, {
         name: 'cdnvideohub',
         title: 'CDNVideoHub',
@@ -12469,14 +12380,6 @@
         kp: true,
         imdb: false
       }, {
-        name: 'anilibria',
-        title: 'AniLibria',
-        source: new anilibria(this, object),
-        search: true,
-        kp: false,
-        imdb: false,
-        disabled: true
-      }, {
         name: 'anilibria2',
         title: 'AniLibria.top',
         source: new anilibria2(this, object),
@@ -12484,36 +12387,12 @@
         kp: false,
         imdb: false
       }, {
-        name: 'animelib',
-        title: 'AnimeLib',
-        source: new animelib(this, object),
-        search: true,
-        kp: false,
-        imdb: false,
-        disabled: true
-      }, {
         name: 'kodik',
         title: 'Kodik',
         source: new kodik(this, object),
         search: true,
         kp: true,
         imdb: true
-      }, {
-        name: 'alloha',
-        title: 'Alloha',
-        source: new alloha(this, object),
-        search: false,
-        kp: true,
-        imdb: true,
-        disabled: true
-      }, {
-        name: 'kinopub',
-        title: 'KinoPub',
-        source: new kinopub(this, object),
-        search: true,
-        kp: false,
-        imdb: true,
-        disabled: true
       }];
       var obj_filter_sources = all_sources.filter(function (s) {
         return !s.disabled;
