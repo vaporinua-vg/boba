@@ -1,4 +1,4 @@
-// 17.08.2026d
+// 17.08.2026e
 
 (function () {
     'use strict';
@@ -12047,7 +12047,7 @@
       var disable_dbg = !Utils.isDebug();
       var isAndroid = Lampa.Platform.is('android');
       isAndroid && Utils.checkAndroidVersion(339);
-      var collapsBlocked = (!startsWith(window.location.protocol, 'http') || window.location.hostname.indexOf('lampa') !== -1) && disable_dbg;
+      var collapsBlocked = false;
       var all_sources = [{
         name: 'lumex',
         title: 'Lumex',
@@ -13460,7 +13460,7 @@
       };
     }
 
-    var mod_version = '17.08.2026d';
+    var mod_version = '17.08.2026e';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
