@@ -1,4 +1,4 @@
-// 17.08.2026g
+// 17.08.2026h
 
 (function () {
     'use strict';
@@ -389,6 +389,99 @@
       return atob('Y2ZfY2xlYXJhbmNlPQ==') + randomId2(43) + '-' + Math.floor(Date.now() / 1000) + atob('LTEuMi4xLjEt') + randomId2(299, '_.');
     }
 
+    var sha256_k = [];
+    var sha256_init = [];
+
+    function sha256Tables() {
+      if (sha256_k.length) return;
+      var composite = {};
+      var found = 0;
+
+      for (var candidate = 2; found < 64; candidate++) {
+        if (composite[candidate]) continue;
+
+        for (var i = candidate * candidate; i < 313; i += candidate) {
+          composite[i] = true;
+        }
+
+        sha256_init[found] = Math.pow(candidate, 1 / 2) % 1 * 4294967296 | 0;
+        sha256_k[found++] = Math.pow(candidate, 1 / 3) % 1 * 4294967296 | 0;
+      }
+    }
+
+    function sha256(str) {
+      sha256Tables();
+
+      function rotate(value, amount) {
+        return value >>> amount | value << 32 - amount;
+      }
+
+      var bytes = unescape(encodeURIComponent(str + ''));
+      var bit_length = bytes.length * 8;
+      var hash = sha256_init.slice(0, 8);
+      var words = [];
+      bytes += '\x80';
+
+      while (bytes.length % 64 !== 56) {
+        bytes += '\x00';
+      }
+
+      for (var i = 0; i < bytes.length; i++) {
+        words[i >> 2] = (words[i >> 2] || 0) | bytes.charCodeAt(i) << (3 - i % 4) * 8;
+      }
+
+      words.push(bit_length / 4294967296 | 0, bit_length | 0);
+
+      for (var chunk = 0; chunk < words.length; chunk += 16) {
+        var w = words.slice(chunk, chunk + 16);
+        var a = hash[0],
+            b = hash[1],
+            c = hash[2],
+            d = hash[3],
+            e = hash[4],
+            f = hash[5],
+            g = hash[6],
+            h = hash[7];
+
+        for (var _i = 0; _i < 64; _i++) {
+          if (_i >= 16) {
+            var w15 = w[_i - 15],
+                w2 = w[_i - 2];
+            w[_i] = w[_i - 16] + (rotate(w15, 7) ^ rotate(w15, 18) ^ w15 >>> 3) + w[_i - 7] + (rotate(w2, 17) ^ rotate(w2, 19) ^ w2 >>> 10) | 0;
+          }
+
+          var temp1 = h + (rotate(e, 6) ^ rotate(e, 11) ^ rotate(e, 25)) + (e & f ^ ~e & g) + sha256_k[_i] + w[_i] | 0;
+          var temp2 = (rotate(a, 2) ^ rotate(a, 13) ^ rotate(a, 22)) + (a & b ^ a & c ^ b & c) | 0;
+          h = g;
+          g = f;
+          f = e;
+          e = d + temp1 | 0;
+          d = c;
+          c = b;
+          b = a;
+          a = temp1 + temp2 | 0;
+        }
+
+        hash[0] = hash[0] + a | 0;
+        hash[1] = hash[1] + b | 0;
+        hash[2] = hash[2] + c | 0;
+        hash[3] = hash[3] + d | 0;
+        hash[4] = hash[4] + e | 0;
+        hash[5] = hash[5] + f | 0;
+        hash[6] = hash[6] + g | 0;
+        hash[7] = hash[7] + h | 0;
+      }
+
+      var result = '';
+
+      for (var _i2 = 0; _i2 < 8; _i2++) {
+        var part = (hash[_i2] >>> 0).toString(16);
+        result += new Array(9 - part.length).join('0') + part;
+      }
+
+      return result;
+    }
+
     function checkAndroidVersion(needVersion) {
       if (typeof AndroidJS !== 'undefined') {
         try {
@@ -421,6 +514,7 @@
       filmixToken: filmixToken,
       filmixUserAgent: filmixUserAgent,
       baseUserAgent: baseUserAgent,
+      sha256: sha256,
       vcdnToken: vcdnToken,
       setMyIp: setMyIp,
       getMyIp: getMyIp,
@@ -1603,26 +1697,34 @@
         'User-Agent': user_agent
       } : {};
       var prox_enc = '';
+      var prox_enc_base = '';
 
       if (prox) {
-        prox_enc += 'param/Origin=' + encodeURIComponent(host) + '/';
-        prox_enc += 'param/Referer=' + encodeURIComponent(ref) + '/';
-        prox_enc += 'param/User-Agent=' + encodeURIComponent(user_agent) + '/';
+        prox_enc_base += 'param/Origin=' + encodeURIComponent(host) + '/';
+        prox_enc_base += 'param/Referer=' + encodeURIComponent(ref) + '/';
+        prox_enc_base += 'param/User-Agent=' + encodeURIComponent(user_agent) + '/';
       }
 
       var cookie = Lampa.Storage.get('online_mod_rezka2_cookie', '') + '';
       if (cookie.indexOf('PHPSESSID=') == -1) cookie = 'PHPSESSID=' + Utils.randomId(26) + (cookie ? '; ' + cookie : '');
 
-      if (cookie) {
-        if (Lampa.Platform.is('android')) {
-          headers.Cookie = cookie;
-        }
+      function applyCookie() {
+        var anubis_cookie = Lampa.Storage.get('online_mod_rezka2_anubis', '') + '';
+        var full_cookie = anubis_cookie ? cookie + '; ' + anubis_cookie : cookie;
+        prox_enc = prox_enc_base;
 
-        if (prox) {
-          prox_enc += 'param/Cookie=' + encodeURIComponent(cookie) + '/';
+        if (full_cookie) {
+          if (Lampa.Platform.is('android')) {
+            headers.Cookie = full_cookie;
+          }
+
+          if (prox) {
+            prox_enc += 'param/Cookie=' + encodeURIComponent(full_cookie) + '/';
+          }
         }
       }
 
+      applyCookie();
       var embed = ref;
       var filter_items = {};
       var choice = {
@@ -1633,8 +1735,145 @@
       };
       var error_message = '';
 
+      function anubisChallenge(str) {
+        if (!str || typeof str !== 'string' || str.indexOf('anubis_challenge') === -1) return null;
+        var found = str.match(/<script id="anubis_challenge" type="application\/json">([\s\S]*?)<\/script>/);
+        if (!found) return null;
+        var json = Lampa.Arrays.decodeJson(found[1], null);
+        var task = json && json.challenge;
+        if (!task || !task.randomData) return null;
+        return {
+          id: task.id || '',
+          data: task.randomData,
+          difficulty: json.rules && json.rules.difficulty || task.difficulty || 4
+        };
+      }
+      /**
+       * Anubis пускает дальше только после перебора хеша с нужным числом нулей
+       */
+
+
+      function anubisSolve(task) {
+        var prefix = new Array(task.difficulty + 1).join('0');
+        var start = Date.now();
+
+        for (var nonce = 0; nonce < 5000000; nonce++) {
+          var hash = Utils.sha256(task.data + nonce);
+
+          if (hash.substring(0, task.difficulty) === prefix) {
+            return {
+              hash: hash,
+              nonce: nonce,
+              elapsed: Date.now() - start
+            };
+          }
+
+          if ((nonce & 4095) === 0 && Date.now() - start > 25000) break;
+        }
+
+        return null;
+      }
+
+      function anubisCookies(json) {
+        var cookieHeaders = json && json.headers && json.headers['set-cookie'] || null;
+        var values = [];
+
+        if (cookieHeaders && cookieHeaders.forEach) {
+          cookieHeaders.forEach(function (param) {
+            var part = (param || '').split(';')[0];
+            var value = part.split('=')[1] || '';
+            if (part.indexOf('anubis') !== -1 && value) values.push(part);
+          });
+        }
+
+        return values;
+      }
+
+      function anubisHeaders(pass_cookie) {
+        var request_headers = {};
+
+        for (var name in headers) {
+          request_headers[name] = headers[name];
+        }
+
+        if (pass_cookie && Lampa.Platform.is('android')) request_headers.Cookie = pass_cookie;
+        return request_headers;
+      }
+
+      function anubisEnc(pass_cookie) {
+        var enc = prox_enc_base;
+        if (prox) enc += 'cookie_plus/param/Cookie=' + encodeURIComponent(pass_cookie || '') + '/';
+        return enc;
+      }
+      /**
+       * Челлендж привязан к куке, выданной вместе с ним, поэтому её возвращаем обратно
+       */
+
+
+      function anubisPass(task, pass_cookie, done) {
+        var solution = anubisSolve(task);
+
+        if (!solution) {
+          done();
+          return;
+        }
+
+        var url = host + '/.within.website/x/cmd/anubis/api/pass-challenge';
+        url = Lampa.Utils.addUrlComponent(url, 'id=' + encodeURIComponent(task.id));
+        url = Lampa.Utils.addUrlComponent(url, 'response=' + solution.hash);
+        url = Lampa.Utils.addUrlComponent(url, 'nonce=' + solution.nonce);
+        url = Lampa.Utils.addUrlComponent(url, 'redir=' + encodeURIComponent(ref));
+        url = Lampa.Utils.addUrlComponent(url, 'elapsedTime=' + solution.elapsed);
+        network.clear();
+        network.timeout(10000);
+        network["native"](component.proxyLink(url, prox, anubisEnc(pass_cookie), 'enc2t'), function (str) {
+          var json = typeof str === 'string' ? Lampa.Arrays.decodeJson(str, {}) : str;
+          var values = anubisCookies(json);
+
+          if (values.length) {
+            Lampa.Storage.set('online_mod_rezka2_anubis', values.join('; '));
+            Lampa.Storage.set('online_mod_rezka2_anubis_time', Date.now() + '');
+            applyCookie();
+          }
+
+          done();
+        }, function (a, c) {
+          done();
+        }, false, {
+          dataType: 'text',
+          headers: anubisHeaders(pass_cookie),
+          returnHeaders: prox ? false : androidHeaders
+        });
+      }
+      /**
+       * Ссылки на видео закрыты проверкой, поэтому решаем её до поиска
+       */
+
+
+      function anubisCheck(done) {
+        var saved = Lampa.Storage.get('online_mod_rezka2_anubis', '') + '';
+        var saved_time = parseInt(Lampa.Storage.get('online_mod_rezka2_anubis_time', '0'), 10) || 0;
+        if (saved && Date.now() - saved_time < 21600000) return done();
+        if (!prox && !androidHeaders) return done();
+        network.clear();
+        network.timeout(10000);
+        network["native"](component.proxyLink(host + '/ajax/get_cdn_series/', prox, anubisEnc(cookie), 'enc2t'), function (str) {
+          var json = typeof str === 'string' ? Lampa.Arrays.decodeJson(str, null) : str;
+          var body = json && typeof json.body === 'string' ? json.body : typeof str === 'string' ? str : '';
+          var task = anubisChallenge(body);
+          if (task) anubisPass(task, anubisCookies(json).join('; '), done);else done();
+        }, function (a, c) {
+          done();
+        }, 'action=get_movie', {
+          dataType: 'text',
+          headers: anubisHeaders(cookie),
+          returnHeaders: prox ? false : androidHeaders
+        });
+      }
+
       function checkErrorForm(str) {
         if (str && (str.indexOf('anubis_challenge') !== -1 || str.indexOf('techaro.lol-anubis') !== -1 || str.indexOf('/.within.website/x/cmd/anubis/') !== -1 || str.indexOf('Проверяем, что вы не бот') !== -1)) {
+          Lampa.Storage.set('online_mod_rezka2_anubis_time', '0');
           error_message = Lampa.Lang.translate('online_mod_rezka2_anubis');
           return;
         }
@@ -1946,7 +2185,9 @@
           });
         };
 
-        if (prox) query_full_search();else query_title_search();
+        anubisCheck(function () {
+          if (prox) query_full_search();else query_title_search();
+        });
       };
 
       this.extendChoice = function (saved) {
@@ -13506,7 +13747,7 @@
       };
     }
 
-    var mod_version = '17.08.2026g';
+    var mod_version = '17.08.2026h';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -13879,11 +14120,11 @@
           zh: 'Kinobase 的 Cookie'
         },
         online_mod_rezka2_anubis: {
-          ru: 'HDrezka защищается от ботов. Включите «Прокси для балансера HDrezka» в настройках',
-          uk: 'HDrezka захищається від ботів. Увімкніть «Проксі для балансера HDrezka» у налаштуваннях',
-          be: 'HDrezka абараняецца ад ботаў. Уключыце «Проксі для балансера HDrezka» у наладах',
-          en: 'HDrezka is blocking bots. Enable "Proxy for HDrezka balancer" in the settings',
-          zh: 'HDrezka 正在拦截机器人。请在设置中启用“HDrezka 平衡器代理”'
+          ru: 'HDrezka проверяет, что вы не бот. Откройте балансер ещё раз',
+          uk: 'HDrezka перевіряє, що ви не бот. Відкрийте балансер ще раз',
+          be: 'HDrezka правярае, што вы не бот. Адкрыйце балансер яшчэ раз',
+          en: 'HDrezka is running a bot check. Open the balancer again',
+          zh: 'HDrezka 正在进行机器人检查，请重新打开该平衡器'
         },
         online_mod_rezka2_mirror: {
           ru: 'Зеркало для HDrezka',
