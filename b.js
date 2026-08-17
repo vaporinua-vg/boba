@@ -12257,9 +12257,8 @@
       var filter = new Lampa.Filter(object);
       var balanser = Lampa.Storage.get('online_mod_balanser', default_balanser) + '';
       var last_bls = Lampa.Storage.field('online_mod_save_last_balanser') === true ? Lampa.Storage.cache('online_mod_last_balanser', 200, {}) : {};
-      var use_stream_proxy = Lampa.Storage.field('online_mod_use_stream_proxy') === true;
-      var rezka2_prx_ukr = '//' + (Lampa.Storage.field('online_mod_rezka2_prx_ukr') || 'prx.ukrtelcdn.net') + '/';
-      var rezka2_fix_stream = Lampa.Storage.field('online_mod_rezka2_fix_stream') === true;
+      var stream_proxy_url = (Lampa.Storage.field('online_mod_stream_proxy_url') || '') + '';
+      if (stream_proxy_url && stream_proxy_url.charAt(stream_proxy_url.length - 1) !== '/') stream_proxy_url += '/';
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true;
       var forcedQuality = '';
       var qualityFilter = {
@@ -12291,20 +12290,7 @@
       };
 
       this.proxyStream = function (url, name) {
-        if (url && use_stream_proxy) {
-          if (name === 'lumex') return url;
-
-          if (name === 'rezka2') {
-            return url.replace(/\/\/(stream\.voidboost\.(cc|top|link|club)|[^\/]*.ukrtelcdn.net|vdbmate.org|sambray.org|rumbegg.org|laptostack.org|frntroy.org|femeretes.org)\//, rezka2_prx_ukr);
-          }
-
-          return (prefer_http ? 'http://apn.cfhttp.top/' : 'https://apn.watch/') + url;
-        }
-
-        if (url && rezka2_fix_stream && name === 'rezka2') {
-          return url.replace(/\/\/(stream\.voidboost\.(cc|top|link|club)|[^\/]*.ukrtelcdn.net)\//, '//femeretes.org/');
-        }
-
+        if (url && stream_proxy_url) return stream_proxy_url + url;
         return url;
       };
 
@@ -13626,7 +13612,7 @@
       };
     }
 
-    var mod_version = '17.08.2026h';
+    var mod_version = '18.08.2026';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -13683,7 +13669,7 @@
       Lampa.Storage.set('online_mod_proxy_kp', 'false');
       Lampa.Params.trigger('online_mod_iframe_proxy', !isTizen || isLocal);
       Lampa.Params.trigger('online_mod_proxy_iframe', false);
-      Lampa.Params.trigger('online_mod_use_stream_proxy', false);
+      Lampa.Storage.set('online_mod_use_stream_proxy', 'false');
       Lampa.Params.trigger('online_mod_proxy_find_ip', false);
       Lampa.Params.trigger('online_mod_proxy_other', false);
       Lampa.Params.trigger('online_mod_proxy_lumex', false);
@@ -13720,22 +13706,13 @@
       Lampa.Params.trigger('online_mod_full_episode_title', false);
       Lampa.Params.trigger('online_mod_av1_support', true);
       Lampa.Params.trigger('online_mod_save_last_balanser', false);
-      Lampa.Params.trigger('online_mod_rezka2_fix_stream', false);
       Lampa.Params.select('online_mod_kinobase_mirror', '', '');
       Lampa.Params.select('online_mod_kinobase_cookie', '', '');
       Lampa.Params.select('online_mod_rezka2_mirror', '', '');
       Lampa.Params.select('online_mod_rezka2_name', '', '');
       Lampa.Params.select('online_mod_rezka2_password', '', '');
       Lampa.Params.select('online_mod_rezka2_cookie', '', '');
-      Lampa.Params.select('online_mod_rezka2_prx_ukr', {
-        'prx.ukrtelcdn.net': 'prx.ukrtelcdn.net',
-        'prx-cogent.ukrtelcdn.net': 'prx-cogent.ukrtelcdn.net',
-        'prx2-cogent.ukrtelcdn.net': 'prx2-cogent.ukrtelcdn.net',
-        'prx3-cogent.ukrtelcdn.net': 'prx3-cogent.ukrtelcdn.net',
-        'prx4-cogent.ukrtelcdn.net': 'prx4-cogent.ukrtelcdn.net',
-        'prx-ams.ukrtelcdn.net': 'prx-ams.ukrtelcdn.net',
-        'prx2-ams.ukrtelcdn.net': 'prx2-ams.ukrtelcdn.net'
-      }, 'prx.ukrtelcdn.net');
+      Lampa.Params.select('online_mod_stream_proxy_url', '', '');
       Lampa.Params.select('online_mod_fancdn_name', '', '');
       Lampa.Params.select('online_mod_fancdn_password', '', '');
       Lampa.Params.select('online_mod_fancdn_cookie', '', '');
@@ -14068,12 +14045,12 @@
           en: 'Fix video stream for HDrezka',
           zh: '修复 HDrezka 的视频流'
         },
-        online_mod_rezka2_prx_ukr: {
-          ru: 'Прокси-сервер для HDrezka (Укр)',
-          uk: 'Проксі-сервер для HDrezka (Укр)',
-          be: 'Проксі-сервер для HDrezka (Укр)',
-          en: 'Proxy server for HDrezka (Ukr)',
-          zh: 'HDrezka 的代理服务器 （乌克兰）'
+        online_mod_stream_proxy_url: {
+          ru: 'Адрес прокси видеопотока',
+          uk: 'Адреса проксі відеопотоку',
+          be: 'Адрас проксі відэаструменю',
+          en: 'Video stream proxy address',
+          zh: '视频流代理地址'
         },
         online_mod_fancdn_name: {
           ru: 'Логин для FanSerials',
@@ -15030,10 +15007,6 @@
         template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_rezka2_cookie\" data-type=\"input\" data-string=\"true\" placeholder=\"#{settings_cub_not_specified}\">\n            <div class=\"settings-param__name\">#{online_mod_rezka2_cookie}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>\n        <div class=\"settings-param selector\" data-name=\"online_mod_rezka2_fill_cookie\" data-static=\"true\">\n            <div class=\"settings-param__name\">#{online_mod_rezka2_fill_cookie}</div>\n            <div class=\"settings-param__status\"></div>\n        </div>";
       }
 
-      {
-        template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_rezka2_fix_stream\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_rezka2_fix_stream}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
-      }
-
       if (Utils.isDebug()) {
         template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_fancdn_name\" data-type=\"input\" placeholder=\"#{settings_cub_not_specified}\">\n            <div class=\"settings-param__name\">#{online_mod_fancdn_name}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>\n        <div class=\"settings-param selector\" data-name=\"online_mod_fancdn_password\" data-type=\"input\" data-string=\"true\" placeholder=\"#{settings_cub_not_specified}\">\n            <div class=\"settings-param__name\">#{online_mod_fancdn_password}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
       }
@@ -15046,8 +15019,7 @@
         template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_fancdn_fill_cookie\" data-static=\"true\">\n            <div class=\"settings-param__name\">#{online_mod_fancdn_fill_cookie}</div>\n            <div class=\"settings-param__status\"></div>\n        </div>";
       }
 
-      template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_use_stream_proxy\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_use_stream_proxy}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
-      template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_rezka2_prx_ukr\" data-type=\"select\">\n            <div class=\"settings-param__name\">#{online_mod_rezka2_prx_ukr}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
+      template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_stream_proxy_url\" data-type=\"input\" placeholder=\"#{settings_cub_not_specified}\">\n            <div class=\"settings-param__name\">#{online_mod_stream_proxy_url}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_find_ip\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_find_ip}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_other\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_other}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_other_url\" data-type=\"input\" placeholder=\"#{settings_cub_not_specified}\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_other_url}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>\n        <div class=\"settings-param selector\" data-name=\"online_mod_secret_password\" data-type=\"input\" data-string=\"true\" placeholder=\"#{settings_cub_not_specified}\">\n            <div class=\"settings-param__name\">#{online_mod_secret_password}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
 
       if (Utils.isDebug()) {
