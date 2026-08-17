@@ -1,4 +1,4 @@
-// 17.08.2026e
+// 17.08.2026g
 
 (function () {
     'use strict';
@@ -84,9 +84,13 @@
       return res;
     }
 
+    function rezka2Host() {
+      return 'https://rezka.ag';
+    }
+
     function rezka2Mirror() {
       var url = Lampa.Storage.get('online_mod_rezka2_mirror', '') + '';
-            if (!url) return 'https://rezka.ag';
+      if (!url) return 'https://kvk.zone';
       if (url.indexOf('://') == -1) url = 'https://' + url;
       if (url.charAt(url.length - 1) === '/') url = url.substring(0, url.length - 1);
       return url;
@@ -134,10 +138,6 @@
 
     function baseUserAgent() {
       return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36';
-    }
-
-    function rezkaUserAgent() {
-      return 'okhttp/4.12.0';
     }
 
     function vcdnToken() {
@@ -217,7 +217,7 @@
         if (name === 'filmix') return proxy_other && !proxy_other_url && proxy_secret_ip || user_proxy1;
         if (name === 'videodb') return user_proxy2;
         if (name === 'fancdn') return user_proxy3;
-        if (name === 'fancdn2') return user_proxy2;
+        if (name === 'fancdn2') return user_proxy3;
         if (name === 'fanserials') return user_proxy1;
         if (name === 'fanserials_cdn') return proxy_secret;
         if (name === 'videoseed') return proxy_secret;
@@ -345,6 +345,7 @@
           var name = link.substring(posStart + 3, posEnd);
           posStart = name.lastIndexOf('/');
           name = posStart !== -1 ? name.substring(posStart + 1) : '';
+          name = name.replace(/\.(php|asp|aspx|jsp|jspx|cgi|pl|py|rb|env|ini|conf|config|htaccess|htpasswd|git|yml|yaml|sql)$/, ".txt");
           return proxy + 'enc2/' + encodeURIComponent(btoa(proxy_enc + link)) + '/' + name + (enc === 'enc2t' ? "?jacred.test" : '');
         }
 
@@ -403,26 +404,12 @@
       return false;
     }
 
-    function canDirectRezka() {
-      try {
-        if (typeof AndroidJS !== 'undefined') return true;
-        if (window.TVXHost || window.TVXManager) return true;
-        if (typeof Lampa !== 'undefined' && Lampa.Platform) {
-          if (Lampa.Platform.is('webos')) return true;
-          if (Lampa.Platform.is('tizen')) return true;
-          if (Lampa.Platform.is('orsay')) return true;
-          if (Lampa.Platform.is('apple')) return true;
-        }
-      } catch (e) {}
-
-      return false;
-    }
-
     var Utils = {
       decodeSecret: decodeSecret,
       isDebug: isDebug,
       isDebug2: isDebug2,
       isDebug3: isDebug3,
+      rezka2Host: rezka2Host,
       rezka2Mirror: rezka2Mirror,
       kinobaseMirror: kinobaseMirror,
       setCurrentFanserialsHost: setCurrentFanserialsHost,
@@ -434,8 +421,6 @@
       filmixToken: filmixToken,
       filmixUserAgent: filmixUserAgent,
       baseUserAgent: baseUserAgent,
-      rezkaUserAgent: rezkaUserAgent,
-      canDirectRezka: canDirectRezka,
       vcdnToken: vcdnToken,
       setMyIp: setMyIp,
       getMyIp: getMyIp,
@@ -1607,14 +1592,12 @@
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true;
       var prefer_mp4 = Lampa.Storage.field('online_mod_prefer_mp4') === true;
       var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
-      var direct = Utils.canDirectRezka();
-      var prox = direct ? '' : component.proxy('rezka2');
-      var custom_mirror = (Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').trim();
-      var host = custom_mirror && !(prox && !proxy_mirror) ? Utils.rezka2Mirror() : 'https://rezka.ag';
+      var prox = component.proxy('rezka2');
+      var host = prox && !proxy_mirror ? Utils.rezka2Host() : Utils.rezka2Mirror();
       var ref = host + '/';
-      var logged_in = !(prox || direct);
-      var user_agent = Utils.rezkaUserAgent();
-      var headers = direct ? {
+      var logged_in = !(prox || Lampa.Platform.is('android'));
+      var user_agent = Utils.baseUserAgent();
+      var headers = Lampa.Platform.is('android') ? {
         'Origin': host,
         'Referer': ref,
         'User-Agent': user_agent
@@ -1631,7 +1614,7 @@
       if (cookie.indexOf('PHPSESSID=') == -1) cookie = 'PHPSESSID=' + Utils.randomId(26) + (cookie ? '; ' + cookie : '');
 
       if (cookie) {
-        if (direct) {
+        if (Lampa.Platform.is('android')) {
           headers.Cookie = cookie;
         }
 
@@ -1651,14 +1634,9 @@
       var error_message = '';
 
       function checkErrorForm(str) {
-        if (str && (str.indexOf('anubis_challenge') !== -1 || str.indexOf('techaro.lol-anubis') !== -1 || str.indexOf('/.within.website/x/cmd/anubis/') !== -1 || str.indexOf('Проверяем, что вы не бот') !== -1)) {
-          error_message = 'HDrezka заблокировала запрос (Anubis). На телевизоре нужен прямой запрос, без CORS-прокси.';
-          return;
-        }
+        var login_form = str.match(/<form id="check-form" class="check-form" method="post" action="\/ajax\/login\/">/);
 
-        var login_page = str && (str.indexOf('<div class="check-title">Вход</div>') !== -1 || /<title>\s*Вход\s*<\/title>/i.test(str)) && str.match(/<form id="check-form" class="check-form" method="post" action="\/ajax\/login\/">/);
-
-        if (login_page) {
+        if (login_form) {
           error_message = Lampa.Lang.translate('online_mod_authorization_required') + ' HDrezka';
           return;
         }
@@ -1714,7 +1692,7 @@
           var url = more_url + '&q=' + encodeURIComponent(query) + '&page=' + encodeURIComponent(page);
           network.clear();
           network.timeout(10000);
-          network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (str) {
+          network["native"](component.proxyLink(url, prox, prox_enc, prox_enc, 'enc2t'), function (str) {
             str = (str || '').replace(/\n/g, '');
             checkErrorForm(str);
             var links = str.match(/<div class="b-content__inline_item-link">\s*<a [^>]*>[^<]*<\/a>\s*<div>[^<]*<\/div>\s*<\/div>/g);
@@ -1901,7 +1879,7 @@
             if (links && links.length) data = data.concat(links);
             if (callback) callback(data, have_more, query);
           }, function (a, c) {
-            if (prox && a.status == 403 && a.responseText && a.responseText.indexOf('<div>105</div>') !== -1) {
+            if (prox && a.status == 403 && (!a.responseText || a.responseText.indexOf('<div>105</div>') !== -1)) {
               Lampa.Storage.set('online_mod_proxy_rezka2', 'false');
             }
 
@@ -1919,15 +1897,6 @@
         };
 
         var query_title_search = function query_title_search() {
-          if (prox) {
-            search_more({
-              items: [],
-              query: component.cleanTitle(select_title),
-              page: 1
-            });
-            return;
-          }
-
           query_search(component.cleanTitle(select_title), [], function (data, have_more, query) {
             if (data && data.length && data.forEach) display(data, have_more, query);else display([]);
           });
@@ -5349,6 +5318,7 @@
 
           if (player) {
             var player_url = Lampa.Utils.addUrlComponent(embed + atob('ZmlsbS5waHA='), 'kp=' + player[2]);
+            var player_ref = component.fixLink(player[1], ref);
             var pos = player[1].indexOf('?');
 
             if (pos !== -1) {
@@ -5360,16 +5330,39 @@
               }
             }
 
+            var player_headers = Lampa.Platform.is('android') ? {
+              'Origin': host,
+              'Referer': player_ref,
+              'User-Agent': user_agent
+            } : {};
+            var prox_enc_player = '';
+
+            if (prox) {
+              prox_enc_player += 'param/Origin=' + encodeURIComponent(host) + '/';
+              prox_enc_player += 'param/Referer=' + encodeURIComponent(player_ref) + '/';
+              prox_enc_player += 'param/User-Agent=' + encodeURIComponent(user_agent) + '/';
+            }
+
+            if (cookie) {
+              if (Lampa.Platform.is('android')) {
+                headers.Cookie = cookie;
+              }
+
+              if (prox) {
+                prox_enc_player += 'param/Cookie=' + encodeURIComponent(cookie) + '/';
+              }
+            }
+
             network.clear();
             network.timeout(10000);
-            network["native"](component.proxyLink(player_url, prox, prox_enc, 'enc2t'), function (json) {
+            network["native"](component.proxyLink(player_url, prox, prox_enc_player, 'enc2t'), function (json) {
               parse(json, function () {
                 component.emptyForQuery(select_title);
               });
             }, function (a, c) {
               component.empty(network.errorDecode(a, c));
             }, false, {
-              headers: headers
+              headers: player_headers
             });
           } else if (authorization_required) component.empty(Lampa.Lang.translate('online_mod_authorization_required') + ' FanSerials');else component.emptyForQuery(select_title);
         }, function (a, c) {
@@ -5817,19 +5810,6 @@
       var host = Utils.fancdnHost();
       var ref = host + '/';
       var user_agent = Utils.baseUserAgent();
-      var headers = Lampa.Platform.is('android') ? {
-        'Origin': host,
-        'Referer': ref,
-        'User-Agent': user_agent
-      } : {};
-      var prox_enc = '';
-
-      if (prox) {
-        prox_enc += 'param/Origin=' + encodeURIComponent(host) + '/';
-        prox_enc += 'param/Referer=' + encodeURIComponent(ref) + '/';
-        prox_enc += 'param/User-Agent=' + encodeURIComponent(user_agent) + '/';
-      }
-
       var embed = host + atob('L2ZpbG0ucGhw');
       var filter_items = {};
       var choice = {
@@ -5838,10 +5818,29 @@
         voice_name: ''
       };
 
-      function fancdn_api_search(api, callback, error) {
-        var url = Lampa.Utils.addUrlComponent(embed, api);
+      function fancdn_api_search(kinopoisk_id, callback, error) {
+        var url = Lampa.Utils.addUrlComponent(embed, 'kp=' + encodeURIComponent(kinopoisk_id));
+        var player_ref = component.fixLink('/movies/' + kinopoisk_id, ref);
         var token = Lampa.Storage.get('online_mod_fancdn_token', '') + '';
-        if (token) url += '&' + token;
+
+        if (token) {
+          url += '&' + token;
+          player_ref += '?' + token;
+        }
+
+        var headers = Lampa.Platform.is('android') ? {
+          'Origin': host,
+          'Referer': player_ref,
+          'User-Agent': user_agent
+        } : {};
+        var prox_enc = '';
+
+        if (prox) {
+          prox_enc += 'param/Origin=' + encodeURIComponent(host) + '/';
+          prox_enc += 'param/Referer=' + encodeURIComponent(player_ref) + '/';
+          prox_enc += 'param/User-Agent=' + encodeURIComponent(user_agent) + '/';
+        }
+
         network.clear();
         network.timeout(10000);
         network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (json) {
@@ -5869,7 +5868,7 @@
         }
 
         var error = component.empty.bind(component);
-        fancdn_api_search('kp=' + encodeURIComponent(kinopoisk_id), function (json) {
+        fancdn_api_search(kinopoisk_id, function (json) {
           parse(json, function () {
             component.emptyForQuery(select_title);
           });
@@ -6312,7 +6311,7 @@
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true;
       var prox = component.proxy('fanserials');
       var prox_cdn = component.proxy('fanserials_cdn');
-      var host = Utils.decodeSecret([95, 57, 28, 42, 55, 125, 28, 124, 25, 93, 66, 41, 7, 46, 48, 49, 92, 33, 25, 76, 26, 33, 7, 40, 32, 33, 90, 63, 23, 27, 69, 56], atob('RnVja0Zhbg=='));
+      var host = Utils.decodeSecret([95, 57, 28, 42, 55, 125, 28, 124, 25, 93, 66, 41, 7, 46, 48, 49, 92, 33, 25, 64, 26, 33, 7, 40, 32, 33, 90, 63, 23, 27, 69, 56], atob('RnVja0Zhbg=='));
       var ref = host + '/';
       var user_agent = Utils.baseUserAgent();
       var headers = Lampa.Platform.is('android') ? {
@@ -6571,7 +6570,10 @@
           extract = json;
           filter();
           append(filtred());
-        } else component.emptyForQuery(select_title);
+        } else {
+          find = str.match(/>(Контент недоступен в вашем регионе[^<]*)</);
+          if (find) component.empty(find[1]);else component.emptyForQuery(select_title);
+        }
       }
       /**
        * Построить фильтр
@@ -12008,14 +12010,14 @@
           if (name === 'lumex') return url;
 
           if (name === 'rezka2') {
-            return url.replace(/\/\/(stream\.voidboost\.(cc|top|link|club|one|net|tv)|[^\/]*.ukrtelcdn.net|vdbmate.org|sambray.org|rumbegg.org|laptostack.org|frntroy.org|femeretes.org)\//, rezka2_prx_ukr);
+            return url.replace(/\/\/(stream\.voidboost\.(cc|top|link|club)|[^\/]*.ukrtelcdn.net|vdbmate.org|sambray.org|rumbegg.org|laptostack.org|frntroy.org|femeretes.org)\//, rezka2_prx_ukr);
           }
 
           return (prefer_http ? 'http://apn.cfhttp.top/' : 'https://apn.watch/') + url;
         }
 
         if (url && rezka2_fix_stream && name === 'rezka2') {
-          return url.replace(/\/\/(stream\.voidboost\.(cc|top|link|club|one|net|tv)|[^\/]*.ukrtelcdn.net)\//, '//femeretes.org/');
+          return url.replace(/\/\/(stream\.voidboost\.(cc|top|link|club)|[^\/]*.ukrtelcdn.net)\//, '//femeretes.org/');
         }
 
         return url;
@@ -12133,7 +12135,7 @@
         search: false,
         kp: true,
         imdb: true,
-        disabled: disable_dbg
+        disabled: true
       }, {
         name: 'fanserials',
         title: 'FanSerials',
@@ -13460,7 +13462,7 @@
       };
     }
 
-    var mod_version = '17.08.2026e';
+    var mod_version = '17.08.2026g';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -13505,12 +13507,6 @@
         Lampa.Storage.set('online_mod_proxy_filmix', 'true');
       }
 
-      Lampa.Storage.set('online_mod_proxy_rezka2', Utils.canDirectRezka() ? 'false' : 'true');
-
-      if ((Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').replace(/\/$/, '') === 'https://kvk.zone') {
-        Lampa.Storage.set('online_mod_rezka2_mirror', '');
-      }
-
       Lampa.Storage.set('online_mod_proxy_videoseed', Lampa.Platform.is('android') || isLocal ? 'false' : 'true');
       Lampa.Storage.set('online_mod_proxy_vibix', Lampa.Platform.is('android') ? 'false' : 'true');
       Lampa.Storage.set('online_mod_proxy_redheadsound', Lampa.Platform.is('android') ? 'false' : 'true');
@@ -13528,7 +13524,7 @@
       Lampa.Params.trigger('online_mod_proxy_other', false);
       Lampa.Params.trigger('online_mod_proxy_lumex', false);
       Lampa.Params.trigger('online_mod_proxy_rezka', false);
-      Lampa.Params.trigger('online_mod_proxy_rezka2', !Utils.canDirectRezka());
+      Lampa.Params.trigger('online_mod_proxy_rezka2', false);
       Lampa.Params.trigger('online_mod_proxy_rezka2_mirror', false);
       Lampa.Params.trigger('online_mod_proxy_kinobase', false);
       Lampa.Params.trigger('online_mod_proxy_collaps', false);
@@ -14204,11 +14200,9 @@
             loadOnline(e.data.movie);
           });
           var after = render.find('.view--torrent');
-          if (after.length) after.after(btn);
-          else {
+          if (after.length) after.after(btn);else {
             after = render.find('.full-start__button').last();
-            if (after.length) after.after(btn);
-            else render.find('.full-start__buttons').append(btn);
+            if (after.length) after.after(btn);else render.find('.full-start__buttons').append(btn);
           }
         }
       });
@@ -14446,8 +14440,7 @@
       var prox_enc = '';
       var returnHeaders = androidHeaders;
       var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
-      var custom_mirror = (Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').trim();
-      var host = custom_mirror && !(prox && !proxy_mirror) ? Utils.rezka2Mirror() : 'https://rezka.ag';
+      var host = prox && !proxy_mirror ? Utils.rezka2Host() : Utils.rezka2Mirror();
       if (!prox && !returnHeaders) prox = Utils.proxy('cookie');
 
       if (!prox && !returnHeaders) {
@@ -14455,7 +14448,7 @@
         return;
       }
 
-      var user_agent = Utils.rezkaUserAgent();
+      var user_agent = Utils.baseUserAgent();
       var headers = Lampa.Platform.is('android') ? {
         'User-Agent': user_agent
       } : {};
@@ -14832,6 +14825,7 @@
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_skip_kp_search\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_skip_kp_search}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_iframe_proxy\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_iframe_proxy}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_iframe\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_balanser} iframe</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
+
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_prefer_http\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_prefer_http}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_prefer_mp4\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_prefer_mp4}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
 
@@ -14879,10 +14873,6 @@
 
       if (Utils.isDebug()) {
         template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_fancdn_fill_cookie\" data-static=\"true\">\n            <div class=\"settings-param__name\">#{online_mod_fancdn_fill_cookie}</div>\n            <div class=\"settings-param__status\"></div>\n        </div>";
-      }
-
-      if (Utils.isDebug()) {
-        template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_fancdn_token\" data-type=\"input\" data-string=\"true\" placeholder=\"#{settings_cub_not_specified}\">\n            <div class=\"settings-param__name\">#{online_mod_fancdn_token}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
       }
 
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_use_stream_proxy\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_use_stream_proxy}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
