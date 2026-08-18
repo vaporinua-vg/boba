@@ -1,4 +1,4 @@
-// 18.08.2026d
+// 18.08.2026e
 
 (function () {
     'use strict';
@@ -1874,6 +1874,15 @@
           if (links && links.length && links.forEach) {
             var is_sure = false;
             var items = links.map(function (l) {
+              if (l && typeof l === 'object' && (l.title || l.link)) {
+                return {
+                  year: l.year,
+                  title: l.title || '',
+                  orig_title: l.orig_title || '',
+                  link: l.link || ''
+                };
+              }
+
               var li = $(l);
               var link = $('a', li);
               var enty = $('.enty', link);
@@ -1897,10 +1906,12 @@
 
               return {
                 year: year,
-                title: titl,
+                title: titl || alt_titl,
                 orig_title: orig_title,
                 link: link.attr('href') || ''
               };
+            }).filter(function (c) {
+              return c.title && c.link;
             });
             var cards = items;
 
@@ -1985,16 +1996,25 @@
           rezkaFetch(search_url, postdata, function (str) {
             str = (str || '').replace(/\n/g, '');
             checkErrorForm(str);
-            var links = str.match(/<li><a href=.*?<\/li>/g);
+            var links = str.match(/<li><a href="[^"]+"[^>]*>[\s\S]*?<span class="enty">[\s\S]*?<\/li>/g) || [];
 
-            if ((!links || !links.length) && str.indexOf('b-content__inline_item-link') !== -1) {
+            if (!links.length && str.indexOf('b-content__inline_item-link') !== -1) {
               var blocks = str.match(/<div class="b-content__inline_item-link">[\s\S]*?<\/div>\s*<\/div>/g) || [];
               links = blocks.map(function (block) {
-                var node = $(block);
-                var href = $('a', node).attr('href') || '';
-                var title = $('a', node).text().trim() || '';
-                var info = $('div', node).text().trim() || '';
-                return '<li><a href="' + href + '"><span class="enty">' + title + '</span> ' + info + '</a></li>';
+                var href = (block.match(/href="([^"]+)"/) || [])[1] || '';
+                var title = ((block.match(/<a [^>]*>([^<]*)<\/a>/) || [])[1] || '').trim();
+                var info = ((block.match(/<div>([^<]*)<\/div>/) || [])[1] || '').trim();
+                var year;
+                var found = info.match(/^(\d{4})\b/);
+                if (found) year = parseInt(found[1]);
+                return {
+                  year: year,
+                  title: title,
+                  orig_title: '',
+                  link: href
+                };
+              }).filter(function (item) {
+                return item.title && item.link;
               });
             }
 
@@ -12096,7 +12116,7 @@
       };
     }
 
-    var mod_version = '18.08.2026d';
+    var mod_version = '18.08.2026e';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -13002,21 +13022,46 @@
     } ///////Rezka2/////////
 
 
+    function rezka2NetConfig() {
+      var nativeHttp = Utils.checkAndroidVersion(16);
+      var prox = Utils.proxy('rezka2');
+      if (!nativeHttp && !prox) prox = Utils.proxy('cookie2');
+      var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
+      var host = nativeHttp || proxy_mirror ? Utils.rezka2Mirror() : Utils.rezka2Host();
+      var headers = nativeHttp ? Utils.rezkaAppHeaders(host) : {};
+      var prox_enc = prox ? Utils.rezkaAppProxEnc(host) : '';
+      var cookie = Lampa.Storage.get('online_mod_rezka2_cookie', '') + '';
+
+      if (cookie) {
+        if (nativeHttp) headers.Cookie = cookie;
+        if (prox) prox_enc += 'param/Cookie=' + encodeURIComponent(cookie) + '/';
+      }
+
+      return {
+        nativeHttp: nativeHttp,
+        prox: prox,
+        host: host,
+        headers: headers,
+        prox_enc: prox_enc
+      };
+    }
+
     function rezka2Login(success, error) {
-      var host = Utils.rezka2Mirror();
-      var url = host + '/ajax/login/';
+      var cfg = rezka2NetConfig();
+      var url = cfg.host + '/ajax/login/';
       var postdata = 'login_name=' + encodeURIComponent(Lampa.Storage.get('online_mod_rezka2_name', ''));
       postdata += '&login_password=' + encodeURIComponent(Lampa.Storage.get('online_mod_rezka2_password', ''));
       postdata += '&login_not_save=0';
-      var headers = Lampa.Platform.is('android') ? Utils.rezkaAppHeaders(host) : {};
       network.clear();
-      network.timeout(8000);
-      network.silent(url, function (json) {
+      network.timeout(15000);
+      network["native"](Utils.proxyLink(url, cfg.prox, cfg.prox_enc, 'enc2t'), function (json) {
+        if (typeof json === 'string') json = Lampa.Arrays.decodeJson(json, {});
+
         if (json && (json.success || json.message == 'Уже авторизован на сайте. Необходимо обновить страницу!')) {
           Lampa.Storage.set('online_mod_rezka2_status', 'true');
           network.clear();
-          network.timeout(8000);
-          network.silent(host + '/', function (str) {
+          network.timeout(15000);
+          network["native"](Utils.proxyLink(cfg.host + '/', cfg.prox, cfg.prox_enc, 'enc2t'), function (str) {
             str = (str || '').replace(/\n/g, '');
             var error_form = str.match(/(<div class="error-code">[^<]*<div>[^<]*<\/div>[^<]*<\/div>)\s*(<div class="error-title">[^<]*<\/div>)/);
 
@@ -13039,8 +13084,7 @@
             if (success) success();
           }, false, {
             dataType: 'text',
-            withCredentials: true,
-            headers: headers
+            headers: cfg.headers
           });
         } else {
           Lampa.Storage.set('online_mod_rezka2_status', 'false');
@@ -13051,16 +13095,16 @@
         Lampa.Noty.show(network.errorDecode(a, c));
         if (error) error();
       }, postdata, {
-        withCredentials: true,
-        headers: headers
+        headers: cfg.headers
       });
     }
 
     function rezka2Logout(success, error) {
-      var url = Utils.rezka2Mirror() + '/logout/';
+      var cfg = rezka2NetConfig();
+      var url = cfg.host + '/logout/';
       network.clear();
-      network.timeout(8000);
-      network.silent(url, function (str) {
+      network.timeout(15000);
+      network["native"](Utils.proxyLink(url, cfg.prox, cfg.prox_enc, 'enc2t'), function (str) {
         Lampa.Storage.set('online_mod_rezka2_status', 'false');
         if (success) success();
       }, function (a, c) {
@@ -13069,24 +13113,26 @@
         if (error) error();
       }, false, {
         dataType: 'text',
-        withCredentials: true
+        headers: cfg.headers
       });
     }
 
     function rezka2FillCookie(success, error) {
+      var nativeHttp = Utils.checkAndroidVersion(16);
       var prox = Utils.proxy('rezka2');
       var prox_enc = '';
       var returnHeaders = androidHeaders;
       var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
-      var host = prox && !proxy_mirror ? Utils.rezka2Host() : Utils.rezka2Mirror();
+      var host = nativeHttp || proxy_mirror ? Utils.rezka2Mirror() : Utils.rezka2Host();
       if (!prox && !returnHeaders) prox = Utils.proxy('cookie');
+      if (!nativeHttp && !prox) prox = Utils.proxy('cookie2');
 
       if (!prox && !returnHeaders) {
         if (error) error();
         return;
       }
 
-      var headers = Lampa.Platform.is('android') ? Utils.rezkaAppHeaders(host) : {};
+      var headers = nativeHttp ? Utils.rezkaAppHeaders(host) : {};
 
       if (prox) {
         prox_enc += Utils.rezkaAppProxEnc(host);
