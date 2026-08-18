@@ -1,4 +1,4 @@
-// 18.08.2026c
+// 18.08.2026d
 
 (function () {
     'use strict';
@@ -90,7 +90,7 @@
 
     function rezka2Mirror() {
       var url = Lampa.Storage.get('online_mod_rezka2_mirror', '') + '';
-      if (!url) return 'https://kvk.zone';
+      if (!url) return 'https://rezka.ag';
       if (url.indexOf('://') == -1) url = 'https://' + url;
       if (url.charAt(url.length - 1) === '/') url = url.substring(0, url.length - 1);
       return url;
@@ -147,17 +147,22 @@
     function rezkaAppHeaders(host) {
       var h = (host || rezka2Mirror() || '') + '';
       if (h.charAt(h.length - 1) === '/') h = h.substring(0, h.length - 1);
-      var ua = h.indexOf('rezka.ag') !== -1 || h.indexOf('hdrezka.') !== -1 ? rezkaUserAgent() : baseUserAgent();
       return {
         'Origin': h,
         'Referer': h + '/',
-        'User-Agent': ua,
-        'X-Requested-With': 'XMLHttpRequest'
+        'User-Agent': baseUserAgent(),
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
       };
     }
 
     function rezkaAppProxEnc(host) {
-      var headers = rezkaAppHeaders(host);
+      var h = (host || rezka2Mirror() || '') + '';
+      if (h.charAt(h.length - 1) === '/') h = h.substring(0, h.length - 1);
+      var headers = {
+        'Origin': h,
+        'Referer': h + '/',
+        'User-Agent': rezkaUserAgent()
+      };
       var prox_enc = '';
 
       for (var name in headers) {
@@ -1619,12 +1624,13 @@
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true;
       var prefer_mp4 = Lampa.Storage.field('online_mod_prefer_mp4') === true;
       var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
+      var nativeHttp = Utils.checkAndroidVersion(16);
       var prox = component.proxy('rezka2');
-      var host = prox && !proxy_mirror ? Utils.rezka2Host() : Utils.rezka2Mirror();
+      if (!nativeHttp && !prox) prox = Utils.proxy('cookie2');
+      var host = nativeHttp || proxy_mirror ? Utils.rezka2Mirror() : Utils.rezka2Host();
       var ref = host + '/';
-      var logged_in = !(prox || Lampa.Platform.is('android'));
-      var rezka_headers = Utils.rezkaAppHeaders(host);
-      var headers = Lampa.Platform.is('android') ? rezka_headers : {};
+      var logged_in = !(prox || nativeHttp);
+      var headers = nativeHttp ? Utils.rezkaAppHeaders(host) : {};
       var prox_enc = prox ? Utils.rezkaAppProxEnc(host) : '';
       var fallback_host = '';
 
@@ -1635,7 +1641,7 @@
       if (cookie.indexOf('PHPSESSID=') == -1) cookie = 'PHPSESSID=' + Utils.randomId(26) + (cookie ? '; ' + cookie : '');
 
       if (cookie) {
-        if (Lampa.Platform.is('android')) {
+        if (nativeHttp) {
           headers.Cookie = cookie;
         }
 
@@ -1700,11 +1706,11 @@
         function startHost() {
           var currentHost = hosts[hostIndex];
           var currentUrl = currentHost === host ? url : url.split(host).join(currentHost);
-          var currentHeaders = currentHost === host ? headers : Lampa.Platform.is('android') ? Utils.rezkaAppHeaders(currentHost) : {};
+          var currentHeaders = nativeHttp ? (currentHost === host ? headers : Utils.rezkaAppHeaders(currentHost)) : {};
           var currentProxEnc = currentHost === host ? prox_enc : prox ? Utils.rezkaAppProxEnc(currentHost) : '';
 
           if (cookie && currentHost !== host) {
-            if (Lampa.Platform.is('android')) currentHeaders.Cookie = cookie;
+            if (nativeHttp) currentHeaders.Cookie = cookie;
             if (prox) currentProxEnc += 'param/Cookie=' + encodeURIComponent(cookie) + '/';
           }
 
@@ -1973,12 +1979,26 @@
         };
 
         var query_search = function query_search(query, data, callback) {
-          var postdata = 'q=' + encodeURIComponent(query);
-          rezkaFetch(url, postdata, function (str) {
+          var use_get = !!prox && !nativeHttp;
+          var search_url = use_get ? more_url + '&q=' + encodeURIComponent(query) : url;
+          var postdata = use_get ? false : 'q=' + encodeURIComponent(query);
+          rezkaFetch(search_url, postdata, function (str) {
             str = (str || '').replace(/\n/g, '');
             checkErrorForm(str);
             var links = str.match(/<li><a href=.*?<\/li>/g);
-            var have_more = str.indexOf('<a class="b-search__live_all"') !== -1;
+
+            if ((!links || !links.length) && str.indexOf('b-content__inline_item-link') !== -1) {
+              var blocks = str.match(/<div class="b-content__inline_item-link">[\s\S]*?<\/div>\s*<\/div>/g) || [];
+              links = blocks.map(function (block) {
+                var node = $(block);
+                var href = $('a', node).attr('href') || '';
+                var title = $('a', node).text().trim() || '';
+                var info = $('div', node).text().trim() || '';
+                return '<li><a href="' + href + '"><span class="enty">' + title + '</span> ' + info + '</a></li>';
+              });
+            }
+
+            var have_more = str.indexOf('<a class="b-search__live_all"') !== -1 || !!str.match(/<a [^>]*>\s*<span class="b-navigation__next\b/);
             if (links && links.length) data = data.concat(links);
             if (callback) callback(data, have_more, query);
           }, function (a, c) {
@@ -12076,7 +12096,7 @@
       };
     }
 
-    var mod_version = '18.08.2026c';
+    var mod_version = '18.08.2026d';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
