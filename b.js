@@ -1,4 +1,4 @@
-// 18.08.2026e
+// 18.08.2026f
 
 (function () {
     'use strict';
@@ -90,9 +90,9 @@
 
     function rezka2Mirror() {
       var url = Lampa.Storage.get('online_mod_rezka2_mirror', '') + '';
-      if (!url) return 'https://rezka.ag';
+      url = url.replace(/\/$/, '');
+      if (!url || url === 'https://kvk.zone' || url === 'http://kvk.zone') return 'https://rezka.ag';
       if (url.indexOf('://') == -1) url = 'https://' + url;
-      if (url.charAt(url.length - 1) === '/') url = url.substring(0, url.length - 1);
       return url;
     }
 
@@ -150,8 +150,7 @@
       return {
         'Origin': h,
         'Referer': h + '/',
-        'User-Agent': baseUserAgent(),
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        'User-Agent': rezkaUserAgent()
       };
     }
 
@@ -1624,18 +1623,15 @@
       var prefer_http = Lampa.Storage.field('online_mod_prefer_http') === true;
       var prefer_mp4 = Lampa.Storage.field('online_mod_prefer_mp4') === true;
       var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
-      var nativeHttp = Utils.checkAndroidVersion(16);
+      var nativeHttp = Lampa.Platform.is('android');
       var prox = component.proxy('rezka2');
       if (!nativeHttp && !prox) prox = Utils.proxy('cookie2');
-      var host = nativeHttp || proxy_mirror ? Utils.rezka2Mirror() : Utils.rezka2Host();
+      var host = Utils.rezka2Mirror();
+      if (!nativeHttp && prox && !proxy_mirror) host = Utils.rezka2Host();
       var ref = host + '/';
-      var logged_in = !(prox || nativeHttp);
       var headers = nativeHttp ? Utils.rezkaAppHeaders(host) : {};
       var prox_enc = prox ? Utils.rezkaAppProxEnc(host) : '';
-      var fallback_host = '';
-
-      if (host.indexOf('kvk.zone') !== -1) fallback_host = Utils.rezka2Host();
-      else if (host !== 'https://kvk.zone') fallback_host = 'https://kvk.zone';
+      var anubis_message = 'HDrezka блокирует запрос (Anubis). Нужно приложение Lampa для Android, не браузер.';
 
       var cookie = Lampa.Storage.get('online_mod_rezka2_cookie', '') + '';
       if (cookie.indexOf('PHPSESSID=') == -1) cookie = 'PHPSESSID=' + Utils.randomId(26) + (cookie ? '; ' + cookie : '');
@@ -1662,7 +1658,7 @@
 
       function checkErrorForm(str) {
         if (str && (str.indexOf('anubis_challenge') !== -1 || str.indexOf('techaro.lol-anubis') !== -1 || str.indexOf('/.within.website/x/cmd/anubis/') !== -1 || str.indexOf('Проверяем, что вы не бот') !== -1)) {
-          error_message = 'Proxy required';
+          error_message = anubis_message;
           return;
         }
 
@@ -1699,83 +1695,73 @@
       }
 
       function rezkaFetch(url, postdata, onsuccess, onerror, asText) {
-        var hosts = [host];
-        if (fallback_host && hosts.indexOf(fallback_host) === -1) hosts.push(fallback_host);
-        var hostIndex = 0;
+        var triedProxy = false;
+        var triedDirect = false;
 
-        function startHost() {
-          var currentHost = hosts[hostIndex];
-          var currentUrl = currentHost === host ? url : url.split(host).join(currentHost);
-          var currentHeaders = nativeHttp ? (currentHost === host ? headers : Utils.rezkaAppHeaders(currentHost)) : {};
-          var currentProxEnc = currentHost === host ? prox_enc : prox ? Utils.rezkaAppProxEnc(currentHost) : '';
+        function failBlocked(res) {
+          checkErrorForm(typeof res === 'string' ? res : '');
+          onerror({
+            status: 403,
+            responseText: anubis_message
+          }, 'custom');
+        }
 
-          if (cookie && currentHost !== host) {
-            if (nativeHttp) currentHeaders.Cookie = cookie;
-            if (prox) currentProxEnc += 'param/Cookie=' + encodeURIComponent(cookie) + '/';
+        function run(useProxy) {
+          if (useProxy) triedProxy = true;else triedDirect = true;
+          var link = useProxy ? component.proxyLink(url, prox, prox_enc, 'enc2t') : url;
+          var opts = {
+            headers: useProxy ? {} : headers
+          };
+          if (asText) opts.dataType = 'text';
+          if (postdata && !useProxy) {
+            opts.headers = {};
+            for (var name in headers) {
+              if (headers.hasOwnProperty(name)) opts.headers[name] = headers[name];
+            }
+            opts.headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
           }
-
-          var triedProxy = false;
-          var triedDirect = false;
-
-          function run(useProxy) {
-            if (useProxy) triedProxy = true;else triedDirect = true;
-            var link = useProxy ? component.proxyLink(currentUrl, prox, currentProxEnc, 'enc2t') : currentUrl;
-            var opts = {
-              withCredentials: !useProxy && logged_in,
-              headers: useProxy ? {} : currentHeaders
-            };
-            if (asText) opts.dataType = 'text';
-            network.clear();
-            network.timeout(20000);
-            network["native"](link, function (res) {
-              if (isBlockedPage(res)) {
-                if (useProxy && !triedDirect) {
-                  error_message = '';
-                  run(false);
-                  return;
-                }
-
-                if (hostIndex + 1 < hosts.length) {
-                  error_message = '';
-                  hostIndex++;
-                  startHost();
-                  return;
-                }
-
-                checkErrorForm(typeof res === 'string' ? res : '');
-                onerror({
-                  status: 403,
-                  responseText: typeof res === 'string' ? res : ''
-                }, 'error');
-                return;
-              }
-
-              onsuccess(res);
-            }, function (a, c) {
+          network.clear();
+          network.timeout(20000);
+          network["native"](link, function (res) {
+            if (isBlockedPage(res)) {
               if (useProxy && !triedDirect) {
+                error_message = '';
                 run(false);
                 return;
               }
 
               if (!useProxy && prox && !triedProxy) {
+                error_message = '';
                 run(true);
                 return;
               }
 
-              if (hostIndex + 1 < hosts.length) {
-                hostIndex++;
-                startHost();
-                return;
-              }
+              failBlocked(res);
+              return;
+            }
 
-              onerror(a, c);
-            }, postdata, opts);
-          }
+            onsuccess(res);
+          }, function (a, c) {
+            if (useProxy && !triedDirect) {
+              run(false);
+              return;
+            }
 
-          if (prox) run(true);else run(false);
+            if (!useProxy && prox && !triedProxy) {
+              run(true);
+              return;
+            }
+
+            if (isBlockedPage(a && a.responseText)) {
+              failBlocked(a.responseText);
+              return;
+            }
+
+            onerror(a, c);
+          }, postdata, opts);
         }
 
-        startHost();
+        if (nativeHttp) run(false);else if (prox) run(true);else run(false);
       }
       /**
        * Поиск
@@ -2097,7 +2083,7 @@
             getEpisodes(success);
           } else if (error_message) component.empty(error_message);else component.emptyForQuery(select_title);
         }, function (a, c) {
-          component.empty(network.errorDecode(a, c));
+          component.empty(error_message || (a && a.responseText === anubis_message ? anubis_message : network.errorDecode(a, c)));
         }, true);
       }
 
@@ -12116,7 +12102,7 @@
       };
     }
 
-    var mod_version = '18.08.2026e';
+    var mod_version = '18.08.2026f';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -12162,6 +12148,10 @@
       }
 
       Lampa.Storage.set('online_mod_proxy_rezka2', 'false');
+
+      if ((Lampa.Storage.get('online_mod_rezka2_mirror', '') + '').replace(/\/$/, '') === 'https://kvk.zone') {
+        Lampa.Storage.set('online_mod_rezka2_mirror', '');
+      }
 
       Lampa.Storage.set('online_mod_proxy_videoseed', Lampa.Platform.is('android') || isLocal ? 'false' : 'true');
       Lampa.Storage.set('online_mod_proxy_vibix', Lampa.Platform.is('android') ? 'false' : 'true');
@@ -13023,11 +13013,10 @@
 
 
     function rezka2NetConfig() {
-      var nativeHttp = Utils.checkAndroidVersion(16);
+      var nativeHttp = Lampa.Platform.is('android');
       var prox = Utils.proxy('rezka2');
       if (!nativeHttp && !prox) prox = Utils.proxy('cookie2');
-      var proxy_mirror = Lampa.Storage.field('online_mod_proxy_rezka2_mirror') === true;
-      var host = nativeHttp || proxy_mirror ? Utils.rezka2Mirror() : Utils.rezka2Host();
+      var host = Utils.rezka2Mirror();
       var headers = nativeHttp ? Utils.rezkaAppHeaders(host) : {};
       var prox_enc = prox ? Utils.rezkaAppProxEnc(host) : '';
       var cookie = Lampa.Storage.get('online_mod_rezka2_cookie', '') + '';
@@ -13039,10 +13028,10 @@
 
       return {
         nativeHttp: nativeHttp,
-        prox: prox,
+        prox: nativeHttp ? '' : prox,
         host: host,
         headers: headers,
-        prox_enc: prox_enc
+        prox_enc: nativeHttp ? '' : prox_enc
       };
     }
 
@@ -13055,7 +13044,15 @@
       network.clear();
       network.timeout(15000);
       network["native"](Utils.proxyLink(url, cfg.prox, cfg.prox_enc, 'enc2t'), function (json) {
-        if (typeof json === 'string') json = Lampa.Arrays.decodeJson(json, {});
+        if (typeof json === 'string') {
+          if (json.indexOf('Проверяем, что вы не бот') !== -1 || json.indexOf('anubis') !== -1) {
+            Lampa.Noty.show('HDrezka блокирует запрос (Anubis). Нужно приложение Lampa для Android, не браузер.');
+            if (error) error();
+            return;
+          }
+
+          json = Lampa.Arrays.decodeJson(json, {});
+        }
 
         if (json && (json.success || json.message == 'Уже авторизован на сайте. Необходимо обновить страницу!')) {
           Lampa.Storage.set('online_mod_rezka2_status', 'true');
@@ -13063,10 +13060,17 @@
           network.timeout(15000);
           network["native"](Utils.proxyLink(cfg.host + '/', cfg.prox, cfg.prox_enc, 'enc2t'), function (str) {
             str = (str || '').replace(/\n/g, '');
+
+            if (str.indexOf('Проверяем, что вы не бот') !== -1 || str.indexOf('anubis') !== -1) {
+              Lampa.Noty.show('HDrezka блокирует запрос (Anubis). Нужно приложение Lampa для Android, не браузер.');
+              if (error) error();
+              return;
+            }
+
             var error_form = str.match(/(<div class="error-code">[^<]*<div>[^<]*<\/div>[^<]*<\/div>)\s*(<div class="error-title">[^<]*<\/div>)/);
 
             if (error_form) {
-              Lampa.Noty.show(error_form[0]);
+              Lampa.Noty.show(($(error_form[1]).text().trim() || '') + ': ' + ($(error_form[2]).text().trim() || ''));
               if (error) error();
               return;
             }
