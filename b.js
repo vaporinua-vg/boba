@@ -1,4 +1,4 @@
-// 18.08.2026h
+// 18.08.2026i
 
 (function () {
     'use strict';
@@ -8913,10 +8913,63 @@
       var prox = component.proxy('cdnvideohub');
       var user_agent = Utils.baseUserAgent();
       var prox_enc = '';
-      var play_headers = {
+      var nativeHttp = Lampa.Platform.is('android');
+      var play_headers = nativeHttp ? {
         Origin: 'https://player.cdnvideohub.com',
         Referer: 'https://player.cdnvideohub.com/'
-      };
+      } : null;
+
+      function isOkCdnUrl(url) {
+        return /(?:^|\/\/)([^\/]*\.)?(vkuser\.net|okcdn\.ru)\b/i.test(url || '');
+      }
+
+      function stripVideoCors(video) {
+        if (!video) return;
+
+        try {
+          video.removeAttribute('crossorigin');
+          video.crossOrigin = null;
+        } catch (e) {}
+      }
+
+      function guardOkCdnVideo() {
+        if (guardOkCdnVideo.done) return;
+        guardOkCdnVideo.done = true;
+
+        try {
+          var proto = window.HTMLMediaElement && window.HTMLMediaElement.prototype;
+          if (!proto) return;
+          var srcDesc = Object.getOwnPropertyDescriptor(proto, 'src');
+
+          if (srcDesc && srcDesc.set) {
+            var setSrc = srcDesc.set;
+            Object.defineProperty(proto, 'src', {
+              configurable: true,
+              enumerable: srcDesc.enumerable,
+              get: srcDesc.get,
+              set: function (value) {
+                if (isOkCdnUrl(value)) stripVideoCors(this);
+                setSrc.call(this, value);
+              }
+            });
+          }
+
+          var setAttr = proto.setAttribute;
+
+          if (setAttr) {
+            proto.setAttribute = function (name, value) {
+              var key = (name || '') + '';
+
+              if (key.toLowerCase() === 'crossorigin' && isOkCdnUrl(this.src)) return;
+              if (key.toLowerCase() === 'src' && isOkCdnUrl(value)) stripVideoCors(this);
+
+              return setAttr.apply(this, arguments);
+            };
+          }
+        } catch (e) {}
+      }
+
+      guardOkCdnVideo();
 
       if (prox) {
         prox_enc += 'param/Origin=/';
@@ -9128,7 +9181,7 @@
           url = url.replace(/\/\?/, '/video.mp4?');
         }
 
-        return component.proxyLink(component.fixLinkProtocol(url, prefer_http, true), prox, prox_enc);
+        return component.proxyLink(component.fixLinkProtocol(url, false, 'full'), prox, prox_enc);
       }
 
       function extractItems(sources) {
@@ -9285,9 +9338,9 @@
                 url: component.getDefaultQuality(element.qualitys, element.stream),
                 quality: component.renameQualityMap(element.qualitys),
                 timeline: element.timeline,
-                title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title),
-                headers: play_headers
+                title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
               };
+              if (play_headers) first.headers = play_headers;
               Lampa.Player.play(first);
 
               if (element.season && Lampa.Platform.version) {
@@ -9308,9 +9361,9 @@
                         });
                       },
                       timeline: elem.timeline,
-                      title: elem.title,
-                      headers: play_headers
+                      title: elem.title
                     };
+                    if (play_headers) cell.headers = play_headers;
                     playlist.push(cell);
                   }
                 });
@@ -12130,7 +12183,7 @@
       };
     }
 
-    var mod_version = '18.08.2026h';
+    var mod_version = '18.08.2026i';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
