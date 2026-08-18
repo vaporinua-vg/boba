@@ -1,4 +1,4 @@
-// 25.07.2026
+// 18.08.2026
 
 (function () {
     'use strict';
@@ -138,6 +138,34 @@
 
     function rezkaUserAgent() {
       return 'okhttp/4.12.0';
+    }
+
+    function rezkaAppVersion() {
+      return '2.2.5';
+    }
+
+    function rezkaAppHeaders(host) {
+      var h = (host || rezka2Mirror() || '') + '';
+      if (h.charAt(h.length - 1) === '/') h = h.substring(0, h.length - 1);
+      return {
+        'Origin': h,
+        'Referer': h + '/',
+        'User-Agent': rezkaUserAgent(),
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-Hdrezka-Android-App': '1',
+        'X-Hdrezka-Android-App-Version': rezkaAppVersion()
+      };
+    }
+
+    function rezkaAppProxEnc(host) {
+      var headers = rezkaAppHeaders(host);
+      var prox_enc = '';
+
+      for (var name in headers) {
+        prox_enc += 'param/' + name + '=' + encodeURIComponent(headers[name]) + '/';
+      }
+
+      return prox_enc;
     }
 
     function vcdnToken() {
@@ -421,6 +449,9 @@
       filmixUserAgent: filmixUserAgent,
       baseUserAgent: baseUserAgent,
       rezkaUserAgent: rezkaUserAgent,
+      rezkaAppVersion: rezkaAppVersion,
+      rezkaAppHeaders: rezkaAppHeaders,
+      rezkaAppProxEnc: rezkaAppProxEnc,
       vcdnToken: vcdnToken,
       setMyIp: setMyIp,
       getMyIp: getMyIp,
@@ -1597,19 +1628,9 @@
       var host = custom_mirror && !(prox && !proxy_mirror) ? Utils.rezka2Mirror() : 'https://rezka.ag';
       var ref = host + '/';
       var logged_in = !(prox || Lampa.Platform.is('android'));
-      var user_agent = Utils.rezkaUserAgent();
-      var headers = Lampa.Platform.is('android') ? {
-        'Origin': host,
-        'Referer': ref,
-        'User-Agent': user_agent
-      } : {};
-      var prox_enc = '';
-
-      if (prox) {
-        prox_enc += 'param/Origin=' + encodeURIComponent(host) + '/';
-        prox_enc += 'param/Referer=' + encodeURIComponent(ref) + '/';
-        prox_enc += 'param/User-Agent=' + encodeURIComponent(user_agent) + '/';
-      }
+      var rezka_headers = Utils.rezkaAppHeaders(host);
+      var headers = Lampa.Platform.is('android') ? rezka_headers : {};
+      var prox_enc = prox ? Utils.rezkaAppProxEnc(host) : '';
 
       var cookie = Lampa.Storage.get('online_mod_rezka2_cookie', '') + '';
       if (cookie.indexOf('PHPSESSID=') == -1) cookie = 'PHPSESSID=' + Utils.randomId(26) + (cookie ? '; ' + cookie : '');
@@ -1698,7 +1719,7 @@
           var url = more_url + '&q=' + encodeURIComponent(query) + '&page=' + encodeURIComponent(page);
           network.clear();
           network.timeout(10000);
-          network["native"](component.proxyLink(url, prox, prox_enc, prox_enc, 'enc2t'), function (str) {
+          network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (str) {
             str = (str || '').replace(/\n/g, '');
             checkErrorForm(str);
             var links = str.match(/<div class="b-content__inline_item-link">\s*<a [^>]*>[^<]*<\/a>\s*<div>[^<]*<\/div>\s*<\/div>/g);
@@ -2285,8 +2306,11 @@
               element.qualitys = quality;
               element.subtitles = parseSubtitles(json.subtitle);
               call(element);
-            } else error();
-          } else error();
+            } else error((json && json.message) || '');
+          } else {
+            if (typeof json === 'string') checkErrorForm(json);
+            error(error_message || (json && json.message) || '');
+          }
         }, function (a, c) {
           error();
         }, postdata, {
@@ -13435,7 +13459,7 @@
       };
     }
 
-    var mod_version = '25.07.2026b';
+    var mod_version = '18.08.2026';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
@@ -14354,6 +14378,7 @@
       var postdata = 'login_name=' + encodeURIComponent(Lampa.Storage.get('online_mod_rezka2_name', ''));
       postdata += '&login_password=' + encodeURIComponent(Lampa.Storage.get('online_mod_rezka2_password', ''));
       postdata += '&login_not_save=0';
+      var headers = Lampa.Platform.is('android') ? Utils.rezkaAppHeaders(host) : {};
       network.clear();
       network.timeout(8000);
       network.silent(url, function (json) {
@@ -14384,7 +14409,8 @@
             if (success) success();
           }, false, {
             dataType: 'text',
-            withCredentials: true
+            withCredentials: true,
+            headers: headers
           });
         } else {
           Lampa.Storage.set('online_mod_rezka2_status', 'false');
@@ -14395,7 +14421,8 @@
         Lampa.Noty.show(network.errorDecode(a, c));
         if (error) error();
       }, postdata, {
-        withCredentials: true
+        withCredentials: true,
+        headers: headers
       });
     }
 
@@ -14430,13 +14457,10 @@
         return;
       }
 
-      var user_agent = Utils.rezkaUserAgent();
-      var headers = Lampa.Platform.is('android') ? {
-        'User-Agent': user_agent
-      } : {};
+      var headers = Lampa.Platform.is('android') ? Utils.rezkaAppHeaders(host) : {};
 
       if (prox) {
-        prox_enc += 'param/User-Agent=' + encodeURIComponent(user_agent) + '/';
+        prox_enc += Utils.rezkaAppProxEnc(host);
         prox_enc += 'cookie_plus/param/Cookie=/';
         returnHeaders = false;
       }
