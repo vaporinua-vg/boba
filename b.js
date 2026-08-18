@@ -1,4 +1,4 @@
-// 18.08.2026g
+// 18.08.2026h
 
 (function () {
     'use strict';
@@ -8913,6 +8913,10 @@
       var prox = component.proxy('cdnvideohub');
       var user_agent = Utils.baseUserAgent();
       var prox_enc = '';
+      var play_headers = {
+        Origin: 'https://player.cdnvideohub.com',
+        Referer: 'https://player.cdnvideohub.com/'
+      };
 
       if (prox) {
         prox_enc += 'param/Origin=/';
@@ -9116,6 +9120,17 @@
        */
 
 
+      function prepareCdnFile(url, ext) {
+        if (!url) return url;
+        url = (url + '').replace(/\\u0026/gi, '&');
+
+        if (ext === 'mp4' && /:\/\/[^\/?#]+\/\?/.test(url)) {
+          url = url.replace(/\/\?/, '/video.mp4?');
+        }
+
+        return component.proxyLink(component.fixLinkProtocol(url, prefer_http, true), prox, prox_enc);
+      }
+
       function extractItems(sources) {
         if (!sources) return [];
         var items = [];
@@ -9125,7 +9140,7 @@
           items.push({
             label: '4K',
             quality: 2160,
-            file: sources.mpeg2kUrl
+            file: prepareCdnFile(sources.mpeg2kUrl, 'mp4')
           });
         }
 
@@ -9133,7 +9148,7 @@
           items.push({
             label: '2K',
             quality: 1440,
-            file: sources.mpeg4kUrl
+            file: prepareCdnFile(sources.mpeg4kUrl, 'mp4')
           });
         }
 
@@ -9141,7 +9156,7 @@
           items.push({
             label: '1440p',
             quality: 1440,
-            file: sources.mpegQhdUrl
+            file: prepareCdnFile(sources.mpegQhdUrl, 'mp4')
           });
         }
 
@@ -9149,7 +9164,7 @@
           items.push({
             label: '1080p',
             quality: 1080,
-            file: sources.mpegFullHdUrl
+            file: prepareCdnFile(sources.mpegFullHdUrl, 'mp4')
           });
         }
 
@@ -9157,7 +9172,7 @@
           items.push({
             label: '720p',
             quality: 720,
-            file: sources.mpegHighUrl
+            file: prepareCdnFile(sources.mpegHighUrl, 'mp4')
           });
         }
 
@@ -9165,7 +9180,7 @@
           items.push({
             label: '480p',
             quality: 480,
-            file: sources.mpegMediumUrl
+            file: prepareCdnFile(sources.mpegMediumUrl, 'mp4')
           });
         }
 
@@ -9173,7 +9188,7 @@
           items.push({
             label: '360p',
             quality: 360,
-            file: sources.mpegLowUrl
+            file: prepareCdnFile(sources.mpegLowUrl, 'mp4')
           });
         }
 
@@ -9181,7 +9196,7 @@
           items.push({
             label: '240p',
             quality: 240,
-            file: sources.mpegLowestUrl
+            file: prepareCdnFile(sources.mpegLowestUrl, 'mp4')
           });
         }
 
@@ -9189,21 +9204,18 @@
           items.push({
             label: '144p',
             quality: 144,
-            file: sources.mpegTinyUrl
+            file: prepareCdnFile(sources.mpegTinyUrl, 'mp4')
           });
         }
 
-        if (!items.length && sources.hlsUrl) {
+        if (sources.hlsUrl) {
           items.push({
             label: 'HLS',
             quality: NaN,
-            file: sources.hlsUrl
+            file: prepareCdnFile(sources.hlsUrl, 'hls')
           });
         }
 
-        items.forEach(function (item) {
-          item.file = component.proxyLink(component.fixLinkProtocol(item.file, prefer_http, true), prox, prox_enc);
-        });
         return items;
       }
       /**
@@ -9273,7 +9285,8 @@
                 url: component.getDefaultQuality(element.qualitys, element.stream),
                 quality: component.renameQualityMap(element.qualitys),
                 timeline: element.timeline,
-                title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
+                title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title),
+                headers: play_headers
               };
               Lampa.Player.play(first);
 
@@ -9295,7 +9308,8 @@
                         });
                       },
                       timeline: elem.timeline,
-                      title: elem.title
+                      title: elem.title,
+                      headers: play_headers
                     };
                     playlist.push(cell);
                   }
@@ -12116,7 +12130,7 @@
       };
     }
 
-    var mod_version = '18.08.2026g';
+    var mod_version = '18.08.2026h';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
