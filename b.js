@@ -1,4 +1,4 @@
-// 18.08.2026f
+// 18.08.2026g
 
 (function () {
     'use strict';
@@ -1631,19 +1631,15 @@
       var ref = host + '/';
       var headers = nativeHttp ? Utils.rezkaAppHeaders(host) : {};
       var prox_enc = prox ? Utils.rezkaAppProxEnc(host) : '';
-      var anubis_message = 'HDrezka блокирует запрос (Anubis). Нужно приложение Lampa для Android, не браузер.';
+      var anubis_message = 'HDrezka блокирует запрос из браузера (Anubis). Нужно приложение Lampa для Android.';
 
       var cookie = Lampa.Storage.get('online_mod_rezka2_cookie', '') + '';
-      if (cookie.indexOf('PHPSESSID=') == -1) cookie = 'PHPSESSID=' + Utils.randomId(26) + (cookie ? '; ' + cookie : '');
 
-      if (cookie) {
-        if (nativeHttp) {
-          headers.Cookie = cookie;
-        }
-
-        if (prox) {
-          prox_enc += 'param/Cookie=' + encodeURIComponent(cookie) + '/';
-        }
+      if (nativeHttp) {
+        if (cookie.indexOf('PHPSESSID=') == -1) cookie = 'PHPSESSID=' + Utils.randomId(26) + (cookie ? '; ' + cookie : '');
+        if (cookie) headers.Cookie = cookie;
+      } else if (cookie) {
+        prox_enc += 'param/Cookie=' + encodeURIComponent(cookie) + '/';
       }
 
       var embed = ref;
@@ -1689,65 +1685,83 @@
         }
       }
 
+      function rezkaToText(res) {
+        if (typeof res === 'string') return res;
+        if (res && typeof res.responseText === 'string') return res.responseText;
+
+        try {
+          if (res && res.body && res.body.innerHTML) return res.body.innerHTML;
+          if (res && res.documentElement && res.documentElement.innerHTML) return res.documentElement.innerHTML;
+        } catch (e) {}
+
+        return '';
+      }
+
       function isBlockedPage(res) {
-        var str = typeof res === 'string' ? res : '';
+        var str = rezkaToText(res);
         return !!(str && (str.indexOf('anubis_challenge') !== -1 || str.indexOf('techaro.lol-anubis') !== -1 || str.indexOf('/.within.website/x/cmd/anubis/') !== -1 || str.indexOf('Проверяем, что вы не бот') !== -1));
       }
 
       function rezkaFetch(url, postdata, onsuccess, onerror, asText) {
-        var triedProxy = false;
-        var triedDirect = false;
+        var proxies = [];
+
+        function addProxy(p) {
+          if (p && proxies.indexOf(p) === -1) proxies.push(p);
+        }
+
+        if (!nativeHttp) {
+          addProxy(prox);
+          addProxy('https://cors.nb557.workers.dev/');
+          addProxy('https://cors.fx666.workers.dev/');
+        }
+
+        var proxyIndex = 0;
 
         function failBlocked(res) {
-          checkErrorForm(typeof res === 'string' ? res : '');
+          checkErrorForm(rezkaToText(res));
           onerror({
             status: 403,
-            responseText: anubis_message
+            responseText: error_message || anubis_message
           }, 'custom');
         }
 
-        function run(useProxy) {
-          if (useProxy) triedProxy = true;else triedDirect = true;
-          var link = useProxy ? component.proxyLink(url, prox, prox_enc, 'enc2t') : url;
-          var opts = {
-            headers: useProxy ? {} : headers
-          };
+        function nativeOpts(useProxy) {
+          var opts = {};
           if (asText) opts.dataType = 'text';
-          if (postdata && !useProxy) {
-            opts.headers = {};
-            for (var name in headers) {
-              if (headers.hasOwnProperty(name)) opts.headers[name] = headers[name];
+
+          if (!useProxy) {
+            opts.headers = headers;
+
+            if (postdata) {
+              var nextHeaders = {};
+
+              for (var name in headers) {
+                if (headers.hasOwnProperty(name)) nextHeaders[name] = headers[name];
+              }
+
+              nextHeaders['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+              opts.headers = nextHeaders;
             }
-            opts.headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
           }
+
+          return opts;
+        }
+
+        function run(useProxy) {
+          var link = useProxy ? component.proxyLink(url, proxies[proxyIndex], prox_enc, 'enc2t') : url;
+          var opts = nativeOpts(useProxy);
           network.clear();
           network.timeout(20000);
           network["native"](link, function (res) {
             if (isBlockedPage(res)) {
-              if (useProxy && !triedDirect) {
-                error_message = '';
-                run(false);
-                return;
-              }
-
-              if (!useProxy && prox && !triedProxy) {
-                error_message = '';
-                run(true);
-                return;
-              }
-
               failBlocked(res);
               return;
             }
 
             onsuccess(res);
           }, function (a, c) {
-            if (useProxy && !triedDirect) {
-              run(false);
-              return;
-            }
-
-            if (!useProxy && prox && !triedProxy) {
+            if (useProxy && proxyIndex + 1 < proxies.length) {
+              proxyIndex++;
               run(true);
               return;
             }
@@ -1761,7 +1775,7 @@
           }, postdata, opts);
         }
 
-        if (nativeHttp) run(false);else if (prox) run(true);else run(false);
+        if (nativeHttp) run(false);else if (proxies.length) run(true);else run(false);
       }
       /**
        * Поиск
@@ -1826,7 +1840,7 @@
 
             if (callback) callback(data, have_more);
           }, function (a, c) {
-            component.empty(network.errorDecode(a, c));
+            component.empty(error_message || network.errorDecode(a, c));
           }, true);
         };
 
@@ -1954,7 +1968,7 @@
               }
             }
 
-            if (cards.length == 1 && is_sure) getPage(cards[0].link);else if (items.length) {
+            if (cards.length == 1 && is_sure && nativeHttp) getPage(cards[0].link);else if (items.length) {
               _this.wait_similars = true;
               items.forEach(function (c) {
                 c.is_similars = true;
@@ -1976,7 +1990,7 @@
         };
 
         var query_search = function query_search(query, data, callback) {
-          var use_get = !!prox && !nativeHttp;
+          var use_get = !nativeHttp;
           var search_url = use_get ? more_url + '&q=' + encodeURIComponent(query) : url;
           var postdata = use_get ? false : 'q=' + encodeURIComponent(query);
           rezkaFetch(search_url, postdata, function (str) {
@@ -2235,7 +2249,7 @@
                 extractEpisodes(json, translator_id);
                 call();
               }, function (a, c) {
-                component.empty(network.errorDecode(a, c));
+                component.empty(error_message || (a && a.responseText === anubis_message ? anubis_message : network.errorDecode(a, c)));
               });
               return;
             }
@@ -2399,7 +2413,7 @@
             error(error_message || (json && json.message) || '');
           }
         }, function (a, c) {
-          error();
+          error(error_message || (a && a.responseText === anubis_message ? anubis_message : network.errorDecode(a, c)));
         });
       }
 
@@ -12102,7 +12116,7 @@
       };
     }
 
-    var mod_version = '18.08.2026f';
+    var mod_version = '18.08.2026g';
     var isMSX = !!(window.TVXHost || window.TVXManager);
     var isTizen = navigator.userAgent.toLowerCase().indexOf('tizen') !== -1;
     var isIFrame = window.parent !== window;
